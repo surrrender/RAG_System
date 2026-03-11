@@ -1,0 +1,14 @@
+.pytest_cache/
+__pycache__/
+*.py[cod]
+
+.venv/
+venv/
+
+*.egg-info/
+build/
+dist/
+
+crawler_part/outputs/
+crawler_part/state/
+crawler_part/pytest-cache-files-*/
