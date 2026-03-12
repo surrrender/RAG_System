@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "embedding-indexing"
+version = "0.1.0"
+description = "Local embedding and Qdrant indexing pipeline for WeChat Mini Program docs."
+requires-python = ">=3.11"
+dependencies = [
+  "orjson>=3.10.0",
+  "qdrant-client>=1.9.0",
+  "sentence-transformers>=3.0.0",
+  "typer>=0.12.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+]
+
+[project.scripts]
+embedding-indexing = "embedding_indexing.cli:app"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.setuptools]
+packages = ["embedding_indexing"]

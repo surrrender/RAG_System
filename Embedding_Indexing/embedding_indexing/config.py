@@ -1,0 +1,12 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_INPUT_PATH = (PROJECT_ROOT.parent / "crawler_part" / "outputs" / "framework_chunks.jsonl").resolve()
+DEFAULT_QDRANT_PATH = (PROJECT_ROOT / "data" / "qdrant").resolve()
+DEFAULT_COLLECTION_NAME = "wechat_framework_chunks"
+DEFAULT_MODEL_NAME = "BAAI/bge-small-zh-v1.5"
+DEFAULT_BATCH_SIZE = 32
+DEFAULT_LIMIT = 5

@@ -1,0 +1,2 @@
+"""Embedding and indexing pipeline."""
+
