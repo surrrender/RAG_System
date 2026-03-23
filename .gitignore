@@ -1,6 +1,14 @@
+.DS_Store
+
 .pytest_cache/
 __pycache__/
 *.py[cod]
+*.pyo
+*.pyd
+
+.coverage
+.mypy_cache/
+.ruff_cache/
 
 .venv/
 venv/
@@ -8,13 +16,14 @@ venv/
 *.egg-info/
 build/
 dist/
+*.tsbuildinfo
 
 Crawler/outputs/
 Crawler/state/
 Crawler/pytest-cache-files-*/
 
-Embedding_Indexing/data
+Embedding_Indexing/data/qdrant
+Embedding_Indexing/data/qdrant_bge_small
 
 FrontEnd/node_modules
-
 
