@@ -1,3 +1,6 @@
+'''
+该代码的主要作用是从侧边栏提取出所有需要爬取的子节点目录
+'''
 from __future__ import annotations
 
 from bs4 import BeautifulSoup

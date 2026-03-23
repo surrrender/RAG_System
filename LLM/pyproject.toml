@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "llm-rag"
+version = "0.1.0"
+description = "Local-model RAG QA service for WeChat Mini Program docs."
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115.0",
+  "ollama>=0.4.0",
+  "pydantic>=2.8.0",
+  "typer>=0.12.0",
+  "uvicorn>=0.30.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+]
+
+[project.scripts]
+llm = "llm.cli:app"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.setuptools]
+packages = ["llm"]

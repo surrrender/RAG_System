@@ -17,11 +17,17 @@ def _write_chunks(path: Path) -> None:
         "\n".join(
             [
                 '{"chunk_id":"c1","doc_id":"d1","url":"https://example.com/app","title":"App 生命周期",'
-                '"nav_path":["框架"],"section_path":["App"],"chunk_text":"app launch show hide lifecycle",'
-                '"code_blocks":[],"token_estimate":5,"fetched_at":"2026-03-12T00:00:00+00:00"}',
+                '"nav_path":["框架"],"section_path":["App"],"chunk_type":"text",'
+                '"chunk_text":"app launch show hide lifecycle","related_code_ids":["c3"],'
+                '"related_text_ids":[],"token_estimate":5,"fetched_at":"2026-03-12T00:00:00+00:00"}',
                 '{"chunk_id":"c2","doc_id":"d2","url":"https://example.com/page","title":"Page 注册",'
-                '"nav_path":["框架"],"section_path":["Page"],"chunk_text":"page register onload onshow methods",'
-                '"code_blocks":[],"token_estimate":5,"fetched_at":"2026-03-12T00:00:00+00:00"}',
+                '"nav_path":["框架"],"section_path":["Page"],"chunk_type":"text",'
+                '"chunk_text":"page register onload onshow methods","related_code_ids":[],"related_text_ids":[],'
+                '"token_estimate":5,"fetched_at":"2026-03-12T00:00:00+00:00"}',
+                '{"chunk_id":"c3","doc_id":"d1","url":"https://example.com/app","title":"App 生命周期",'
+                '"nav_path":["框架"],"section_path":["App"],"chunk_type":"code",'
+                '"chunk_text":"App({ onLaunch() {} })","related_code_ids":[],"related_text_ids":["c1"],'
+                '"token_estimate":5,"fetched_at":"2026-03-12T00:00:00+00:00"}',
             ]
         ),
         encoding="utf-8",
@@ -54,5 +60,7 @@ def test_index_and_search_round_trip() -> None:
             limit=1,
         )
 
-    assert stats.chunk_count == 2
+    assert stats.chunk_count == 3
+    assert [result["chunk_type"] for result in results] == ["text", "code"]
     assert results[0]["chunk_id"] == "c1"
+    assert results[1]["chunk_id"] == "c3"

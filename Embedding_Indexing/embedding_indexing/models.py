@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 
@@ -12,10 +12,12 @@ class ChunkRecord:
     title: str
     nav_path: list[str]
     section_path: list[str]
+    chunk_type: str
     chunk_text: str
-    code_blocks: list[str]
     token_estimate: int
     fetched_at: str
+    related_code_ids: list[str] = field(default_factory=list)
+    related_text_ids: list[str] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> "ChunkRecord":
@@ -26,8 +28,10 @@ class ChunkRecord:
             title=str(payload["title"]),
             nav_path=[str(item) for item in payload.get("nav_path", [])],
             section_path=[str(item) for item in payload.get("section_path", [])],
+            chunk_type=str(payload.get("chunk_type", "text")),
             chunk_text=str(payload["chunk_text"]),
-            code_blocks=[str(item) for item in payload.get("code_blocks", [])],
+            related_code_ids=[str(item) for item in payload.get("related_code_ids", [])],
+            related_text_ids=[str(item) for item in payload.get("related_text_ids", [])],
             token_estimate=int(payload.get("token_estimate", 0)),
             fetched_at=str(payload["fetched_at"]),
         )

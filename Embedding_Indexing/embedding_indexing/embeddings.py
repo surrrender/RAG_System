@@ -89,7 +89,6 @@ def _tokenize(text: str) -> Iterable[str]:
 def chunk_to_embedding_text(chunk: ChunkRecord) -> str:
     return chunk.chunk_text.strip()
 
-
 def build_embedder(provider: str, model_name: str, hash_dimension: int = 32, offline: bool = False) -> BaseEmbedder:
     if provider == "sentence-transformer":
         return SentenceTransformerEmbedder(model_name, offline=offline)

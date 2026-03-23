@@ -10,7 +10,7 @@ from crawler.models import ExtractedPage
 from crawler.utils import clean_text
 
 
-HEADING_NAMES = {"h1", "h2", "h3", "h4"}
+HEADING_NAMES = {"h2", "h3", "h4"}
 SECTION_HEADING_NAMES = {"h2", "h3", "h4"}
 IGNORED_CONTAINER_NAMES = {"footer"}
 
@@ -54,7 +54,6 @@ def extract_page_content(html: str, url: str, config: CrawlConfig) -> ExtractedP
     # 获取main节点的body
     content = _pick_content_node(soup, config.selectors.content_selectors)
     # TODO：这里存疑不确实是否要flip，而且不确定这里的titlenode是作为数据源还是单纯作为展示title
-    # TODO：停到了这里
     title_node = content.find("h1") or soup.find("title")
     title = clean_text(title_node.get_text(" ", strip=True) if title_node else "")
     if not title:
@@ -69,7 +68,7 @@ def extract_page_content(html: str, url: str, config: CrawlConfig) -> ExtractedP
         if block and block not in code_blocks:
             code_blocks.append(block)
 
-    # TODO：这里可能存在将code重复获取两次的问题
+    # 在页面级别获取 raw_text 的时候的确已经将代码包含了进去
     raw_text = clean_text(content.get_text("\n", strip=True))
     if not raw_text:
         raise ValueError("content text empty")
@@ -84,8 +83,10 @@ def extract_page_content(html: str, url: str, config: CrawlConfig) -> ExtractedP
     )
 
 
-# 提取标题块，按照标题进行拆分的核心逻辑
 def extract_heading_blocks(html: str, config: CrawlConfig) -> list[dict[str, object]]:
+    """
+    提取标题块，按照标题进行拆分的核心逻辑
+    """
     soup = BeautifulSoup(html, "lxml")
     content = _pick_content_node(soup, config.selectors.content_selectors)
     blocks: list[dict[str, object]] = []
@@ -128,6 +129,68 @@ def extract_heading_blocks(html: str, config: CrawlConfig) -> list[dict[str, obj
             code_text = clean_text(node.get_text(" ", strip=True))
             if code_text:
                 current_codes.append(code_text)
+            continue
+        if name == "code" and node.parent and node.parent.name == "pre":
+            continue
+        if name in {"p", "li", "td", "th", "blockquote"}:
+            if not heading_stack:
+                continue
+            text = clean_text(node.get_text(" ", strip=True))
+            if text:
+                current_lines.append(text)
+
+    flush()
+    return blocks
+
+
+def extract_heading_blocks_with_code_and_text_handling_together(html: str, config: CrawlConfig) -> list[dict[str, object]]:
+    """
+    提取标题块，按照标题进行拆分的核心逻辑;将文本和相关代码块作为一个整体进行提取,而不是分开
+    """
+    soup = BeautifulSoup(html, "lxml")
+    content = _pick_content_node(soup, config.selectors.content_selectors)
+    blocks: list[dict[str, object]] = []
+    heading_stack: list[str] = []
+    current_lines: list[str] = []
+    current_codes: list[str] = []
+
+    def flush() -> None:
+        text = clean_text("\n".join(current_lines))
+        if text or current_codes:
+            blocks.append(
+                {
+                    "section_path": heading_stack.copy(),
+                    "text": text,
+                    "code_blocks": current_codes.copy(),# 这里返回的 code_blocks 会一直为空
+                }
+            )
+        current_lines.clear()
+        current_codes.clear()
+
+    for node in content.descendants:
+        # 对于Tag标签的内容不予理睬
+        if not isinstance(node, Tag):
+            continue
+        name = node.name.lower()
+        if name in IGNORED_CONTAINER_NAMES or node.find_parent(IGNORED_CONTAINER_NAMES) is not None:
+            continue
+        if name in HEADING_NAMES:
+            flush()
+            level = int(name[1])
+            heading_text = clean_text(node.get_text(" ", strip=True))
+            if not heading_text:
+                continue
+            heading_stack[:] = heading_stack[: max(0, level - 1)]
+            heading_stack.append(heading_text)
+            continue
+        if name == "pre":
+            if not heading_stack:
+                continue
+            code_text = clean_text(node.get_text(" ", strip=True))
+            if code_text:
+                #TODO:这里是不是加上一些标识代码的语义文本会比较好
+                current_lines.append(code_text)
+                # current_codes.append(code_text)
             continue
         if name == "code" and node.parent and node.parent.name == "pre":
             continue

@@ -1,12 +1,12 @@
 # Embedding Indexing
 
-用于将 `crawler_part` 产出的微信小程序文档切块数据做向量化，并写入本地 Qdrant 索引，供后续检索与 RAG 使用。
+用于将 `Crawler` 产出的微信小程序文档切块数据做向量化，并写入本地 Qdrant 索引，供后续检索与 RAG 使用。
 
 当前实现是单机、本地优先方案：
 
-- 默认 embedding 模型：`BAAI/bge-small-zh-v1.5`
+- 默认 embedding 模型：`BAAI/bge-m3`
 - 默认向量库：`Qdrant local mode`
-- 默认输入：`../crawler_part/outputs/framework_chunks.jsonl`
+- 默认输入：`../Crawler/outputs/framework_chunks.jsonl`
 - 默认集合名：`wechat_framework_chunks`
 
 ## 功能概览
@@ -16,6 +16,7 @@
 - 使用稳定 UUID 作为 Qdrant point id，并在 payload 中保留原始 `chunk_id`
 - 同一个 `chunk_id` 会映射到同一个 point id，因此重复导入时会稳定 upsert
 - 提供本地检索命令，便于快速验证召回结果
+- 检索时会分别从 `text` 和 `code` 两类 chunk 中各取前 N 条结果
 - 提供一个测试用 `hash` embedder，方便在未下载真实模型时做基础联调
 
 ## 目录结构
@@ -45,7 +46,7 @@
 安装项目和开发依赖：
 
 ```bash
-python -m pip install -e .[dev]
+python -m pip install -e '.[dev]'
 ```
 
 如果你只想先验证命令和流程，不想立即下载大模型，可以先使用测试 embedder：
@@ -64,7 +65,7 @@ python -m embedding_indexing index --embedder-provider hash --model-name ignored
 默认读取父项目爬虫产物：
 
 ```text
-../crawler_part/outputs/framework_chunks.jsonl
+../Crawler/outputs/framework_chunks.jsonl
 ```
 
 每行是一个 chunk 级 JSON，当前索引流程会使用这些字段：
@@ -75,14 +76,16 @@ python -m embedding_indexing index --embedder-provider hash --model-name ignored
 - `title`
 - `nav_path`
 - `section_path`
+- `chunk_type`
 - `chunk_text`
-- `code_blocks`
+- `related_code_ids`
+- `related_text_ids`
 - `token_estimate`
 - `fetched_at`
 
 其中：
 
-- embedding 默认只对 `chunk_text` 编码
+- embedding 默认只对 `chunk_text` 编码，因此文本 chunk 和代码 chunk 都会被单独向量化
 - metadata 会完整写入 Qdrant payload
 - `chunk_id` 会保留在 Qdrant payload 中
 - Qdrant 内部 point id 会由 `chunk_id` 映射为稳定 UUID
@@ -101,10 +104,10 @@ python -m embedding_indexing index
 
 ```bash
 python -m embedding_indexing index ^
-  --input-path ..\crawler_part\outputs\framework_chunks.jsonl ^
+  --input-path ..\Crawler\outputs\framework_chunks.jsonl ^
   --qdrant-path .\data\qdrant ^
   --collection-name wechat_framework_chunks ^
-  --model-name BAAI/bge-small-zh-v1.5 ^
+  --model-name BAAI/bge-m3 ^
   --embedder-provider sentence-transformer ^
   --batch-size 32 ^
   --recreate
@@ -130,9 +133,9 @@ indexed 456 chunks into wechat_framework_chunks (dim=1024) at D:\...\Embedding_I
 
 注意：
 
-- 如果你之前用 `hash` embedder 建过索引，再切换到 `BAAI/bge-small-zh-v1.5` 这类真实模型时，必须使用 `--recreate`
+- 如果你之前用 `hash` embedder 或旧的 embedding 模型建过索引，再切换到 `BAAI/bge-m3` 时，必须使用 `--recreate`
 - 或者改用新的 `--qdrant-path` / `--collection-name`
-- 原因是旧集合的向量维度可能是 `64`，而当前默认模型的向量维度是 `512`，两者不能混用
+- 原因是旧集合的向量维度很可能与当前默认模型不同，不能混用
 
 ### 2. 查询检索结果
 
@@ -146,24 +149,27 @@ python -m embedding_indexing search "小程序 App 生命周期"
 python -m embedding_indexing search "Page onLoad 是什么时候触发的" ^
   --qdrant-path .\data\qdrant ^
   --collection-name wechat_framework_chunks ^
-  --model-name BAAI/bge-small-zh-v1.5 ^
+  --model-name BAAI/bge-m3 ^
   --embedder-provider sentence-transformer ^
-  --limit 5
+  --limit 3
 ```
 
 说明：
 
 - `search` 命令默认已经开启 `--offline`
+- `--limit` 表示每种 `chunk_type` 单独返回的数量，默认 `3`
+- 默认情况下最终会返回最多 `6` 条结果：`text` 前 `3` 条 + `code` 前 `3` 条
 - 如果本地还没有缓存对应模型，请先运行一次 `index` 下载模型，或手动传入 `--no-offline`
 
 输出是 JSON 数组，包含：
 
 - `score`
 - `chunk_id`
+- `chunk_type`
 - `title`
 - `url`
 - `section_path`
-- `text`
+- `chunk_text`
 
 ## 默认数据映射
 
@@ -172,13 +178,15 @@ python -m embedding_indexing search "Page onLoad 是什么时候触发的" ^
 - `id`: `uuid5(chunk_id)` 生成的稳定 UUID
 - `vector`: chunk embedding
 - `payload.chunk_id`: `chunk_id`
+- `payload.chunk_type`: `chunk_type`
 - `payload.text`: `chunk_text`
 - `payload.doc_id`: `doc_id`
 - `payload.url`: `url`
 - `payload.title`: `title`
 - `payload.nav_path`: `nav_path`
 - `payload.section_path`: `section_path`
-- `payload.code_blocks`: `code_blocks`
+- `payload.related_code_ids`: `related_code_ids`
+- `payload.related_text_ids`: `related_text_ids`
 - `payload.token_estimate`: `token_estimate`
 - `payload.fetched_at`: `fetched_at`
 
@@ -211,13 +219,12 @@ python -m pytest -o cache_dir=state/.pytest_cache
 ## 已知限制
 
 - 当前只做 dense embedding 检索，还没有接入 reranker
-- 当前默认只编码 `chunk_text`，没有把 `code_blocks` 拼入向量文本
+- 当前默认只编码 `chunk_text`，代码依赖独立的 `code` chunk 参与召回
 - 当前没有实现“只重建变更 chunk”的增量索引逻辑
-- 首次使用 `BAAI/bge-small-zh-v1.5` 会下载模型，耗时取决于网络和磁盘
-- 当前环境下 `BAAI/bge-m3` 默认不作为推荐运行配置，若要启用建议单独验证模型下载和加载兼容性
-- 如果已有旧的 `64` 维 hash 索引，直接切换到默认 `512` 维模型会报维度不匹配；需要 `--recreate` 或换新的索引目录/集合
+- 首次使用 `BAAI/bge-m3` 会下载模型，耗时取决于网络、磁盘和可用内存
+- 如果已有旧的 hash 索引或旧 embedding 模型索引，切换到当前默认模型可能会报维度不匹配；需要 `--recreate` 或换新的索引目录/集合
 - `search` 现在会先检查 collection 维度是否和当前模型一致，不一致时会直接给出明确错误
-- 检索接口当前只返回原始 top-k 结果，还没有按 `doc_id` 做聚合或去重
+- 检索接口当前会按 `chunk_type` 分别取回结果，但还没有按 `doc_id` 做聚合或去重
 
 ## 后续建议
 
@@ -225,7 +232,7 @@ python -m pytest -o cache_dir=state/.pytest_cache
 
 1. 增加增量索引，只处理新增或变化的 `chunk_id`
 2. 增加检索评估脚本，固定一批问题做召回验证
-3. 增加 reranker，对 top-k 结果重排
+3. 增加 reranker，对 text/code 分桶召回后的结果重排
 4. 增加 metadata filter 和按文档聚合输出
 
 ## 关键文件

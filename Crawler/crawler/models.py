@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from typing import Any
 
 
@@ -28,10 +28,12 @@ class ChunkRecord:
     title: str
     nav_path: list[str]
     section_path: list[str]
+    chunk_type: str # 类型为 text 或者 code
     chunk_text: str
-    code_blocks: list[str]
     token_estimate: int
     fetched_at: str
+    related_code_ids: list[str] = field(default_factory=list)
+    related_text_ids: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

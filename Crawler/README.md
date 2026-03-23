@@ -8,6 +8,7 @@
 - 从侧边栏定位“框架”目录并提取文档链接
 - 逐页抓取正文、标题、导航路径、更新时间、代码块
 - 按 `h2/h3/h4` 标题层级切块
+- 文本内容与代码示例分开产出，代码也会单独成为可索引 chunk
 - 输出页面级、切块级、失败记录三类 JSONL
 - 支持 `full` 全量重爬和 `incremental` 增量输出
 
@@ -31,7 +32,7 @@
 安装项目依赖和开发依赖：
 
 ```bash
-python -m pip install -e .[dev]
+python -m pip install -e '.[dev]'
 ```
 
 安装 Playwright Chromium：
@@ -123,12 +124,14 @@ crawl complete: discovered=123 fetched=123 chunks=456 failed=0
 - `title`
 - `nav_path`
 - `section_path`
+- `chunk_type`
 - `chunk_text`
-- `code_blocks`
+- `related_code_ids`
+- `related_text_ids`
 - `token_estimate`
 - `fetched_at`
 
-示例：
+文本 chunk 示例：
 
 ```json
 {
@@ -138,9 +141,30 @@ crawl complete: discovered=123 fetched=123 chunks=456 failed=0
   "title": "App",
   "nav_path": ["文档", "框架", "App"],
   "section_path": ["注册", "参数"],
+  "chunk_type": "text",
   "chunk_text": "该章节正文",
-  "code_blocks": ["App({})"],
+  "related_code_ids": ["1f2a3b4c5d6e7f80-ffeeddccbbaa00998877"],
+  "related_text_ids": [],
   "token_estimate": 42,
+  "fetched_at": "2026-03-10T03:00:00+00:00"
+}
+```
+
+代码 chunk 示例：
+
+```json
+{
+  "chunk_id": "1f2a3b4c5d6e7f80-ffeeddccbbaa00998877",
+  "doc_id": "1f2a3b4c5d6e7f80",
+  "url": "https://developers.weixin.qq.com/miniprogram/dev/reference/api/App.html",
+  "title": "App",
+  "nav_path": ["文档", "框架", "App"],
+  "section_path": ["注册", "参数"],
+  "chunk_type": "code",
+  "chunk_text": "App({})",
+  "related_code_ids": [],
+  "related_text_ids": ["1f2a3b4c5d6e7f80-aabbccddeeff00112233"],
+  "token_estimate": 3,
   "fetched_at": "2026-03-10T03:00:00+00:00"
 }
 ```
@@ -170,6 +194,7 @@ crawl complete: discovered=123 fetched=123 chunks=456 failed=0
 - URL 会做标准化、绝对化和去重
 - 正文区域优先从 `main`、`.markdown-doc`、`.doc-content`、`.markdown-body`、`article` 中选择
 - 切块按 `h1/h2/h3/h4` 生效
+- 文本说明与代码示例会拆成独立 chunk，并通过 `related_code_ids` / `related_text_ids` 建立关联
 - 空块会被过滤
 - 超短块会与前一个块合并，降低噪音
 - 抓取失败会按指数退避重试，默认 `3` 次

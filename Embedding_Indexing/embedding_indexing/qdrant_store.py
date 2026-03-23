@@ -9,13 +9,15 @@ from embedding_indexing.models import ChunkRecord
 def chunk_to_payload(chunk: ChunkRecord) -> dict[str, object]:
     return {
         "chunk_id": chunk.chunk_id,
+        "chunk_type": chunk.chunk_type,
         "text": chunk.chunk_text,
         "doc_id": chunk.doc_id,
         "url": chunk.url,
         "title": chunk.title,
         "nav_path": chunk.nav_path,
         "section_path": chunk.section_path,
-        "code_blocks": chunk.code_blocks,
+        "related_code_ids": chunk.related_code_ids,
+        "related_text_ids": chunk.related_text_ids,
         "token_estimate": chunk.token_estimate,
         "fetched_at": chunk.fetched_at,
     }
@@ -82,10 +84,27 @@ class QdrantChunkIndex:
             ]
             self.client.upsert(collection_name=self.collection_name, points=points)
 
-    def search(self, query_vector: list[float], limit: int = 5) -> list[object]:
+    def search(
+        self,
+        query_vector: list[float],
+        limit: int = 5,
+        chunk_type: str | None = None,
+    ) -> list[object]:
+        query_filter = None
+        if chunk_type is not None:
+            query_filter = self._rest.Filter(
+                must=[
+                    self._rest.FieldCondition(
+                        key="chunk_type",
+                        match=self._rest.MatchValue(value=chunk_type),
+                    )
+                ]
+            )
+
         return self.client.query_points(
             collection_name=self.collection_name,
             query=query_vector,
             limit=limit,
             with_payload=True,
+            query_filter=query_filter,
         ).points

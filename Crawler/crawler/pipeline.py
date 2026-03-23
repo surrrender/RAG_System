@@ -8,7 +8,7 @@ from playwright.async_api import Browser, BrowserContext, Page, async_playwright
 from crawler.chunking import build_chunks
 from crawler.config import CrawlConfig
 from crawler.discovery import extract_framework_links
-from crawler.extraction import extract_heading_blocks, extract_page_content
+from crawler.extraction import extract_heading_blocks, extract_page_content, extract_heading_blocks_with_code_and_text_handling_together
 from crawler.models import FailureRecord, PageRecord
 from crawler.storage import ensure_runtime_dirs, load_fingerprints, save_fingerprints, write_jsonl
 from crawler.utils import compute_fingerprint, make_doc_id, normalize_url, utc_now_iso
@@ -114,7 +114,7 @@ async def _fetch_one(context: BrowserContext, url: str, config: CrawlConfig) -> 
                 fetched_at=utc_now_iso(),
                 updated_at=extracted.updated_at,
             )
-            return FetchedPage(page=page_record, heading_blocks=extract_heading_blocks(html, config)), None
+            return FetchedPage(page=page_record, heading_blocks=extract_heading_blocks_with_code_and_text_handling_together(html, config)), None
         except Exception as exc:  # noqa: BLE001
             last_error = str(exc)
             if attempt < config.retries:

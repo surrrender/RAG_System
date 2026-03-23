@@ -31,8 +31,14 @@ def make_doc_id(url: str) -> str:
     return hashlib.sha256(url.encode("utf-8")).hexdigest()[:16]
 
 
-def make_chunk_id(doc_id: str, section_path: list[str], chunk_text: str) -> str:
-    payload = f"{doc_id}|{' > '.join(section_path)}|{chunk_text[:200]}"
+def make_chunk_id(
+    doc_id: str,
+    section_path: list[str],
+    chunk_text: str,
+    chunk_type: str = "text",
+    salt: str = "",
+) -> str:
+    payload = f"{doc_id}|{chunk_type}|{' > '.join(section_path)}|{salt}|{chunk_text[:200]}"
     digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:20]
     return f"{doc_id}-{digest}"
 

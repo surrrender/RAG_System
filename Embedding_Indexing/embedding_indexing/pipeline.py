@@ -51,18 +51,11 @@ def search_chunks(
     index = QdrantChunkIndex(path=qdrant_path, collection_name=collection_name)
     index.ensure_collection(vector_size=embedder.dimension, recreate=False)
     query_vector = embedder.embed_query(query)
-    points = index.search(query_vector=query_vector, limit=limit)
-    return [
-        {
-            "score": float(point.score),
-            "chunk_id": str(point.payload.get("chunk_id") or point.id),
-            "title": point.payload.get("title"),
-            "url": point.payload.get("url"),
-            "section_path": point.payload.get("section_path"),
-            "text": point.payload.get("text"),
-        }
-        for point in points
-    ]
+    # text_points = index.search(query_vector=query_vector, limit=limit, chunk_type="text")
+    # code_points = index.search(query_vector=query_vector, limit=limit, chunk_type="code")
+    # return [_point_to_result(point) for point in [*text_points, *code_points]]
+    text_points = index.search(query_vector = query_vector, limit = limit)
+    return [_point_to_result(point) for point in text_points]
 
 
 def build_default_embedder(
@@ -77,3 +70,15 @@ def build_default_embedder(
         hash_dimension=hash_dimension,
         offline=offline,
     )
+
+
+def _point_to_result(point: object) -> dict[str, object]:
+    return {
+        "score": float(point.score),
+        "chunk_id": str(point.payload.get("chunk_id") or point.id),
+        "title": point.payload.get("title"),
+        "url": point.payload.get("url"),
+        "section_path": point.payload.get("section_path"),
+        "chunk_type": point.payload.get("chunk_type"),
+        "chunk_text": point.payload.get("text"),
+    }
