@@ -13,20 +13,34 @@ class Retriever:
     collection_name: str
     embedder_provider: str
     embedding_model: str
+    reranker_provider: str
+    reranker_model: str
+    rerank_candidate_limit: int = 10
+    disable_reranker: bool = False
 
     def retrieve(self, question: str, top_k: int) -> list[RetrievedChunk]:
-        build_default_embedder, search_chunks = load_embedding_indexing_symbols()
+        build_default_embedder, build_default_reranker, search_chunks = load_embedding_indexing_symbols()
         embedder = build_default_embedder(
             provider=self.embedder_provider,
             model_name=self.embedding_model,
             offline=True,
         )
+        reranker = None
+        if not self.disable_reranker:
+            reranker = build_default_reranker(
+                provider=self.reranker_provider,
+                model_name=self.reranker_model,
+                offline=True,
+            )
         results = search_chunks(
             qdrant_path=self.qdrant_path,
             collection_name=self.collection_name,
             embedder=embedder,
             query=question,
             limit=top_k,
+            reranker=reranker,
+            enable_reranker=not self.disable_reranker,
+            rerank_candidate_limit=self.rerank_candidate_limit,
         )
         chunks = [
             RetrievedChunk(

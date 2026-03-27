@@ -29,7 +29,14 @@
 
 ## 安装
 
-安装项目依赖和开发依赖：
+推荐先在仓库根目录创建并激活统一 Python 环境，详见 [根目录 README](/Users/shizhuo/Documents/Study/RAG/RAG_System/README.md)：
+
+```bash
+python3 scripts/bootstrap_python_workspace.py
+source .venv/bin/activate
+```
+
+如果你只想单独安装当前子项目，也可以继续执行：
 
 ```bash
 python -m pip install -e '.[dev]'

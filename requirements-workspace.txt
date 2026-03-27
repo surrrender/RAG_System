@@ -1,0 +1,3 @@
+-e ./Crawler
+-e ./Embedding_Indexing
+-e ./LLM

@@ -1,0 +1,83 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+from typer.testing import CliRunner
+
+from embedding_indexing import cli
+
+
+runner = CliRunner()
+
+
+def test_search_cli_enables_reranker_by_default(monkeypatch) -> None:
+    calls: dict[str, object] = {}
+
+    def fake_embedder(**kwargs):
+        calls["embedder"] = kwargs
+        return object()
+
+    def fake_reranker(**kwargs):
+        calls["reranker"] = kwargs
+        return object()
+
+    def fake_search_chunks(**kwargs):
+        calls["search"] = kwargs
+        return [{"score": 1.0, "chunk_id": "c1"}]
+
+    monkeypatch.setattr(cli, "build_default_embedder", fake_embedder)
+    monkeypatch.setattr(cli, "build_default_reranker", fake_reranker)
+    monkeypatch.setattr(cli, "search_chunks", fake_search_chunks)
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "search",
+            "app lifecycle",
+            "--qdrant-path",
+            str(Path.cwd()),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert calls["reranker"] == {
+        "provider": "cross-encoder",
+        "model_name": "BAAI/bge-reranker-base",
+        "offline": True,
+    }
+    assert calls["search"]["enable_reranker"] is True
+    assert calls["search"]["rerank_candidate_limit"] == 10
+
+
+def test_search_cli_can_disable_reranker(monkeypatch) -> None:
+    calls: dict[str, object] = {}
+
+    def fake_embedder(**kwargs):
+        return object()
+
+    def fake_search_chunks(**kwargs):
+        calls["search"] = kwargs
+        return [{"score": 1.0, "chunk_id": "c1"}]
+
+    monkeypatch.setattr(cli, "build_default_embedder", fake_embedder)
+    monkeypatch.setattr(cli, "search_chunks", fake_search_chunks)
+
+    def fail_build_reranker(**kwargs):
+        raise AssertionError("reranker should not be built when disabled")
+
+    monkeypatch.setattr(cli, "build_default_reranker", fail_build_reranker)
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "search",
+            "app lifecycle",
+            "--qdrant-path",
+            str(Path.cwd()),
+            "--disable-reranker",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert calls["search"]["enable_reranker"] is False
+    assert calls["search"]["reranker"] is None

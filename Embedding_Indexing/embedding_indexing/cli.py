@@ -12,8 +12,15 @@ from embedding_indexing.config import (
     DEFAULT_LIMIT,
     DEFAULT_MODEL_NAME,
     DEFAULT_QDRANT_PATH,
+    DEFAULT_RERANK_CANDIDATE_LIMIT,
+    DEFAULT_RERANKER_MODEL_NAME,
 )
-from embedding_indexing.pipeline import build_default_embedder, index_chunks, search_chunks
+from embedding_indexing.pipeline import (
+    build_default_embedder,
+    build_default_reranker,
+    index_chunks,
+    search_chunks,
+)
 
 app = typer.Typer(help="Embedding and local Qdrant indexing for chunked docs.")
 
@@ -62,6 +69,11 @@ def search(
     limit: int = typer.Option(DEFAULT_LIMIT, min=1),
     hash_dimension: int = typer.Option(64, min=4, help="Only used by the hash embedder."),
     offline: bool = typer.Option(True, help="Load embedding model from local cache only."),
+    reranker_provider: str = typer.Option("cross-encoder"),
+    reranker_model_name: str = typer.Option(DEFAULT_RERANKER_MODEL_NAME),
+    rerank_candidate_limit: int = typer.Option(DEFAULT_RERANK_CANDIDATE_LIMIT, min=1),
+    reranker_offline: bool = typer.Option(True, help="Load reranker model from local cache only."),
+    disable_reranker: bool = typer.Option(False, help="Skip reranking and return dense retrieval results."),
 ) -> None:
     embedder = build_default_embedder(
         provider=embedder_provider,
@@ -69,11 +81,21 @@ def search(
         hash_dimension=hash_dimension,
         offline=offline,
     )
+    reranker = None
+    if not disable_reranker:
+        reranker = build_default_reranker(
+            provider=reranker_provider,
+            model_name=reranker_model_name,
+            offline=reranker_offline,
+        )
     results = search_chunks(
         qdrant_path=qdrant_path,
         collection_name=collection_name,
         embedder=embedder,
         query=query,
         limit=limit,
+        reranker=reranker,
+        enable_reranker=not disable_reranker,
+        rerank_candidate_limit=rerank_candidate_limit,
     )
     typer.echo(json.dumps(results, ensure_ascii=False, indent=2))

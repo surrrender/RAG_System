@@ -2,19 +2,22 @@
 
 基于本地 `Ollama` 和现有 `Embedding_Indexing` Qdrant 索引的单轮问答模块。
 
+默认会复用 `Embedding_Indexing` 的检索链路：
+
+- embedding 模型：`BAAI/bge-m3`
+- reranker 模型：`BAAI/bge-reranker-base`
+- 检索流程：`dense 召回 -> rerank 重排 -> 送入 LLM 生成`
+
 ## 安装
 
-先安装向量检索模块：
+推荐先在仓库根目录创建并激活统一 Python 环境，详见 [根目录 README](/Users/shizhuo/Documents/Study/RAG/RAG_System/README.md)：
 
 ```bash
-python -m pip install -e ../Embedding_Indexing
+python3 scripts/bootstrap_python_workspace.py
+source .venv/bin/activate
 ```
 
-再安装当前项目：
-
-```bash
-python -m pip install -e '.[dev]'
-```
+如果是首次运行，并且本地还没有缓存 embedding / reranker 模型，请先保证 `Embedding_Indexing` 侧模型已经下载完成。
 
 ## CLI
 

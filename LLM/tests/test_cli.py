@@ -1,3 +1,6 @@
+import sys
+from types import SimpleNamespace
+
 from typer.testing import CliRunner
 
 from llm.cli import app
@@ -43,7 +46,8 @@ def test_serve_command_starts_uvicorn(monkeypatch) -> None:
     def fake_run(app_instance: object, host: str, port: int) -> None:
         calls.append((app_instance, host, port))
 
-    monkeypatch.setattr("uvicorn.run", fake_run)
+    monkeypatch.setitem(sys.modules, "uvicorn", SimpleNamespace(run=fake_run))
+    monkeypatch.setattr("llm.cli.create_app", lambda settings: object())
 
     result = runner.invoke(app, ["serve"])
 

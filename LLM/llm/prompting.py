@@ -6,7 +6,7 @@ from llm.models import RetrievedChunk
 SYSTEM_PROMPT = """你是一个面向微信小程序文档的问答助手。
 请严格依据提供的检索资料回答，不要编造资料中没有的信息。
 如果资料不足以支持明确答案，请直接说明“未找到足够依据”，并简要指出还缺什么信息。
-回答要简洁、准确，优先给出结论，再给出必要说明。"""
+回答要精准、丰富，优先给出结论，再给出必要说明。"""
 
 
 def build_prompt(question: str, chunks: list[RetrievedChunk], max_context_chars: int) -> str:
@@ -29,7 +29,7 @@ def build_prompt(question: str, chunks: list[RetrievedChunk], max_context_chars:
         f"用户问题：\n{question.strip()}\n\n"
         f"检索资料：\n{joined_context or '无可用资料'}\n\n"
         "代码格式:如果输出内容中包含代码,请使用``包含单行代码或者```来包含代码片段"
-        "请输出简洁答案，并只使用检索资料能支持的内容。"
+        "请输出答案，并只使用检索资料能支持的内容。"
     )
 
 

@@ -6,6 +6,7 @@ from pathlib import Path
 from embedding_indexing.embeddings import BaseEmbedder, build_embedder, chunk_to_embedding_text
 from embedding_indexing.io import load_chunks
 from embedding_indexing.qdrant_store import QdrantChunkIndex
+from embedding_indexing.rerankers import BaseReranker, build_reranker
 
 
 @dataclass(slots=True)
@@ -47,15 +48,24 @@ def search_chunks(
     embedder: BaseEmbedder,
     query: str,
     limit: int = 5,
+    reranker: BaseReranker | None = None,
+    enable_reranker: bool = True,
+    rerank_candidate_limit: int = 10,
 ) -> list[dict[str, object]]:
+    if enable_reranker and reranker is None:
+        raise ValueError("Reranker is enabled, but no reranker instance was provided.")
+
     index = QdrantChunkIndex(path=qdrant_path, collection_name=collection_name)
     index.ensure_collection(vector_size=embedder.dimension, recreate=False)
     query_vector = embedder.embed_query(query)
-    # text_points = index.search(query_vector=query_vector, limit=limit, chunk_type="text")
-    # code_points = index.search(query_vector=query_vector, limit=limit, chunk_type="code")
-    # return [_point_to_result(point) for point in [*text_points, *code_points]]
-    text_points = index.search(query_vector = query_vector, limit = limit)
-    return [_point_to_result(point) for point in text_points]
+    candidate_limit = max(limit, rerank_candidate_limit)
+    points = index.search(query_vector=query_vector, limit=candidate_limit)
+
+    if not enable_reranker:
+        return [_point_to_result(point) for point in points[:limit]]
+
+    ranked_points = _rerank_points(query=query, points=points, reranker=reranker)
+    return [_point_to_result(point, score=score) for point, score in ranked_points[:limit]]
 
 
 def build_default_embedder(
@@ -72,9 +82,38 @@ def build_default_embedder(
     )
 
 
-def _point_to_result(point: object) -> dict[str, object]:
+def build_default_reranker(
+    provider: str,
+    model_name: str,
+    offline: bool = False,
+) -> BaseReranker:
+    return build_reranker(
+        provider=provider,
+        model_name=model_name,
+        offline=offline,
+    )
+
+
+def _rerank_points(
+    query: str,
+    points: list[object],
+    reranker: BaseReranker,
+) -> list[tuple[object, float]]:
+    documents = [str(point.payload.get("text") or "") for point in points]
+    scores = reranker.rerank(query=query, documents=documents)
+    if len(scores) != len(points):
+        raise RuntimeError(
+            f"Reranker returned {len(scores)} scores for {len(points)} candidates."
+        )
+
+    ranked = list(zip(points, scores, strict=True))
+    ranked.sort(key=lambda item: item[1], reverse=True)
+    return ranked
+
+
+def _point_to_result(point: object, score: float | None = None) -> dict[str, object]:
     return {
-        "score": float(point.score),
+        "score": float(point.score if score is None else score),
         "chunk_id": str(point.payload.get("chunk_id") or point.id),
         "title": point.payload.get("title"),
         "url": point.payload.get("url"),

@@ -5,6 +5,7 @@
 当前实现是单机、本地优先方案：
 
 - 默认 embedding 模型：`BAAI/bge-m3`
+- 默认 reranker 模型：`BAAI/bge-reranker-base`
 - 默认向量库：`Qdrant local mode`
 - 默认输入：`../Crawler/outputs/framework_chunks.jsonl`
 - 默认集合名：`wechat_framework_chunks`
@@ -16,7 +17,7 @@
 - 使用稳定 UUID 作为 Qdrant point id，并在 payload 中保留原始 `chunk_id`
 - 同一个 `chunk_id` 会映射到同一个 point id，因此重复导入时会稳定 upsert
 - 提供本地检索命令，便于快速验证召回结果
-- 检索时会分别从 `text` 和 `code` 两类 chunk 中各取前 N 条结果
+- `search` 默认执行 dense 召回后再用 Cross-Encoder reranker 重排
 - 提供一个测试用 `hash` embedder，方便在未下载真实模型时做基础联调
 
 ## 目录结构
@@ -37,13 +38,20 @@
 ## 环境要求
 
 - Python `3.11+`
-- 建议先在虚拟环境中安装依赖
+- 推荐使用仓库根目录统一的 `.venv`
 - 首次使用默认模型时需要联网下载 Hugging Face 模型文件
 - 模型下载完成后，建议查询时设置 `HF_HUB_OFFLINE=1`，避免每次查询都去请求 Hugging Face 元数据
 
 ## 安装
 
-安装项目和开发依赖：
+推荐先在仓库根目录创建并激活统一 Python 环境，详见 [根目录 README](/Users/shizhuo/Documents/Study/RAG/RAG_System/README.md)：
+
+```bash
+python3 scripts/bootstrap_python_workspace.py
+source .venv/bin/activate
+```
+
+如果你只想单独安装当前子项目，也可以继续执行：
 
 ```bash
 python -m pip install -e '.[dev]'
@@ -58,7 +66,7 @@ python -m embedding_indexing index --embedder-provider hash --model-name ignored
 说明：
 
 - `index` 默认允许联网下载模型，因为首次建索引通常需要拉取模型文件
-- `search` 默认使用离线模式，只从本地缓存加载模型，避免每次查询都访问 Hugging Face
+- `search` 默认对 embedding 模型和 reranker 都使用离线模式，只从本地缓存加载模型
 
 ## 输入数据格式
 
@@ -151,15 +159,19 @@ python -m embedding_indexing search "Page onLoad 是什么时候触发的" ^
   --collection-name wechat_framework_chunks ^
   --model-name BAAI/bge-m3 ^
   --embedder-provider sentence-transformer ^
+  --reranker-model-name BAAI/bge-reranker-base ^
+  --rerank-candidate-limit 10 ^
   --limit 3
 ```
 
 说明：
 
 - `search` 命令默认已经开启 `--offline`
-- `--limit` 表示每种 `chunk_type` 单独返回的数量，默认 `3`
-- 默认情况下最终会返回最多 `6` 条结果：`text` 前 `3` 条 + `code` 前 `3` 条
-- 如果本地还没有缓存对应模型，请先运行一次 `index` 下载模型，或手动传入 `--no-offline`
+- `search` 命令默认也会开启 reranker，并默认开启 `--reranker-offline`
+- `--limit` 表示最终返回的结果数量，默认 `5`
+- `--rerank-candidate-limit` 表示 dense 阶段先召回多少条候选，再交给 reranker 重排，默认 `10`
+- 如果本地还没有缓存 embedding 模型或 reranker 模型，请先在联网状态运行一次查询，或手动传入 `--no-offline --no-reranker-offline`
+- 如果只想看原始 dense 结果，可以传入 `--disable-reranker`
 
 输出是 JSON 数组，包含：
 
@@ -210,6 +222,7 @@ python -m pytest -o cache_dir=state/.pytest_cache
 
 - JSONL chunk 读取
 - 基于测试 embedder 的基础索引/检索流程
+- search CLI 的 reranker 默认开启与显式关闭行为
 
 说明：
 
@@ -218,13 +231,12 @@ python -m pytest -o cache_dir=state/.pytest_cache
 
 ## 已知限制
 
-- 当前只做 dense embedding 检索，还没有接入 reranker
 - 当前默认只编码 `chunk_text`，代码依赖独立的 `code` chunk 参与召回
 - 当前没有实现“只重建变更 chunk”的增量索引逻辑
-- 首次使用 `BAAI/bge-m3` 会下载模型，耗时取决于网络、磁盘和可用内存
+- 首次使用 `BAAI/bge-m3` 或 `BAAI/bge-reranker-base` 会下载模型，耗时取决于网络、磁盘和可用内存
 - 如果已有旧的 hash 索引或旧 embedding 模型索引，切换到当前默认模型可能会报维度不匹配；需要 `--recreate` 或换新的索引目录/集合
 - `search` 现在会先检查 collection 维度是否和当前模型一致，不一致时会直接给出明确错误
-- 检索接口当前会按 `chunk_type` 分别取回结果，但还没有按 `doc_id` 做聚合或去重
+- 检索接口当前直接对整个集合召回并重排，还没有按 `doc_id` 做聚合或去重
 
 ## 后续建议
 
@@ -232,8 +244,8 @@ python -m pytest -o cache_dir=state/.pytest_cache
 
 1. 增加增量索引，只处理新增或变化的 `chunk_id`
 2. 增加检索评估脚本，固定一批问题做召回验证
-3. 增加 reranker，对 text/code 分桶召回后的结果重排
-4. 增加 metadata filter 和按文档聚合输出
+3. 增加 metadata filter 和按文档聚合输出
+4. 增加更细粒度的检索评估，对 dense 与 rerank 两阶段分别打指标
 
 ## 关键文件
 

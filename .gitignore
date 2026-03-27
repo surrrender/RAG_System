@@ -12,6 +12,7 @@ __pycache__/
 
 .venv/
 venv/
+.workspace/
 
 *.egg-info/
 build/
@@ -22,8 +23,9 @@ Crawler/outputs/
 Crawler/state/
 Crawler/pytest-cache-files-*/
 
+outputs/
+
 Embedding_Indexing/data/qdrant
 Embedding_Indexing/data/qdrant_bge_small
 
 FrontEnd/node_modules
-

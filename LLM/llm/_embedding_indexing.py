@@ -11,11 +11,11 @@ def _add_local_project_path() -> None:
         sys.path.insert(0, project_path)
 
 
-def load_embedding_indexing_symbols() -> tuple[object, object]:
+def load_embedding_indexing_symbols() -> tuple[object, object, object]:
     try:
-        from embedding_indexing.pipeline import build_default_embedder, search_chunks
+        from embedding_indexing.pipeline import build_default_embedder, build_default_reranker, search_chunks
     except ModuleNotFoundError:
         _add_local_project_path()
-        from embedding_indexing.pipeline import build_default_embedder, search_chunks
+        from embedding_indexing.pipeline import build_default_embedder, build_default_reranker, search_chunks
 
-    return build_default_embedder, search_chunks
+    return build_default_embedder, build_default_reranker, search_chunks

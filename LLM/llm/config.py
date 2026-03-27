@@ -11,6 +11,9 @@ DEFAULT_QDRANT_PATH = (REPO_ROOT / "Embedding_Indexing" / "data" / "qdrant").res
 DEFAULT_COLLECTION_NAME = "wechat_framework_chunks"
 DEFAULT_EMBEDDER_PROVIDER = "sentence-transformer"
 DEFAULT_EMBEDDING_MODEL = "BAAI/bge-m3"
+DEFAULT_RERANKER_PROVIDER = "cross-encoder"
+DEFAULT_RERANKER_MODEL = "BAAI/bge-reranker-base"
+DEFAULT_RERANK_CANDIDATE_LIMIT = 10
 DEFAULT_TOP_K = 5
 DEFAULT_MAX_CONTEXT_CHARS = 5000
 DEFAULT_OLLAMA_HOST = "http://127.0.0.1:11434"
@@ -35,12 +38,23 @@ def _env_float(name: str, default: float) -> float:
     return float(value)
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 @dataclass(slots=True)
 class Settings:
     qdrant_path: Path = Path(os.getenv("LLM_QDRANT_PATH", DEFAULT_QDRANT_PATH))
     collection_name: str = os.getenv("LLM_COLLECTION_NAME", DEFAULT_COLLECTION_NAME)
     embedder_provider: str = os.getenv("LLM_EMBEDDER_PROVIDER", DEFAULT_EMBEDDER_PROVIDER)
     embedding_model: str = os.getenv("LLM_EMBEDDING_MODEL", DEFAULT_EMBEDDING_MODEL)
+    reranker_provider: str = os.getenv("LLM_RERANKER_PROVIDER", DEFAULT_RERANKER_PROVIDER)
+    reranker_model: str = os.getenv("LLM_RERANKER_MODEL", DEFAULT_RERANKER_MODEL)
+    rerank_candidate_limit: int = _env_int("LLM_RERANK_CANDIDATE_LIMIT", DEFAULT_RERANK_CANDIDATE_LIMIT)
+    disable_reranker: bool = _env_bool("LLM_DISABLE_RERANKER", False)
     top_k: int = _env_int("LLM_TOP_K", DEFAULT_TOP_K)
     max_context_chars: int = _env_int("LLM_MAX_CONTEXT_CHARS", DEFAULT_MAX_CONTEXT_CHARS)
     ollama_host: str = os.getenv("LLM_OLLAMA_HOST", DEFAULT_OLLAMA_HOST)

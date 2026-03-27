@@ -10,6 +10,8 @@ def test_retriever_normalizes_results() -> None:
         collection_name="demo",
         embedder_provider="sentence-transformer",
         embedding_model="BAAI/bge-m3",
+        reranker_provider="cross-encoder",
+        reranker_model="BAAI/bge-reranker-base",
     )
 
     def fake_build_default_embedder(provider: str, model_name: str, offline: bool, **_: object) -> str:
@@ -18,8 +20,17 @@ def test_retriever_normalizes_results() -> None:
         assert offline is True
         return "EMBEDDER"
 
+    def fake_build_default_reranker(provider: str, model_name: str, offline: bool, **_: object) -> str:
+        assert provider == "cross-encoder"
+        assert model_name == "BAAI/bge-reranker-base"
+        assert offline is True
+        return "RERANKER"
+
     def fake_search_chunks(**kwargs: object) -> list[dict[str, object]]:
         assert kwargs["embedder"] == "EMBEDDER"
+        assert kwargs["reranker"] == "RERANKER"
+        assert kwargs["enable_reranker"] is True
+        assert kwargs["rerank_candidate_limit"] == 10
         assert kwargs["query"] == "test"
         assert kwargs["limit"] == 2
         return [
@@ -29,13 +40,48 @@ def test_retriever_normalizes_results() -> None:
                 "title": "Title",
                 "url": "https://example.com",
                 "section_path": ["A", "B"],
-                "text": "content",
+                "chunk_text": "content",
             }
         ]
 
-    with patch("llm.retrieval.load_embedding_indexing_symbols", return_value=(fake_build_default_embedder, fake_search_chunks)):
+    with patch(
+        "llm.retrieval.load_embedding_indexing_symbols",
+        return_value=(fake_build_default_embedder, fake_build_default_reranker, fake_search_chunks),
+    ):
         results = retriever.retrieve("test", top_k=2)
 
     assert len(results) == 1
     assert results[0].chunk_id == "chunk-1"
     assert results[0].section_path == ["A", "B"]
+    assert results[0].text == "content"
+
+
+def test_retriever_can_disable_reranker() -> None:
+    retriever = Retriever(
+        qdrant_path=Path("/tmp/qdrant"),
+        collection_name="demo",
+        embedder_provider="sentence-transformer",
+        embedding_model="BAAI/bge-m3",
+        reranker_provider="cross-encoder",
+        reranker_model="BAAI/bge-reranker-base",
+        disable_reranker=True,
+    )
+
+    def fake_build_default_embedder(**_: object) -> str:
+        return "EMBEDDER"
+
+    def fail_build_default_reranker(**_: object) -> str:
+        raise AssertionError("reranker should not be built when disabled")
+
+    def fake_search_chunks(**kwargs: object) -> list[dict[str, object]]:
+        assert kwargs["enable_reranker"] is False
+        assert kwargs["reranker"] is None
+        return []
+
+    with patch(
+        "llm.retrieval.load_embedding_indexing_symbols",
+        return_value=(fake_build_default_embedder, fail_build_default_reranker, fake_search_chunks),
+    ):
+        results = retriever.retrieve("test", top_k=2)
+
+    assert results == []

@@ -58,6 +58,10 @@ def build_service(settings: Settings | None = None) -> QAService:
         collection_name=current.collection_name,
         embedder_provider=current.embedder_provider,
         embedding_model=current.embedding_model,
+        reranker_provider=current.reranker_provider,
+        reranker_model=current.reranker_model,
+        rerank_candidate_limit=current.rerank_candidate_limit,
+        disable_reranker=current.disable_reranker,
     )
     generator = OllamaGenerator(
         host=current.ollama_host,
