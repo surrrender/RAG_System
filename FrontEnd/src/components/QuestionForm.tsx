@@ -6,6 +6,7 @@ interface QuestionFormProps {
   topK: number;
   loading: boolean;
   validationError: string | null;
+  onStop: () => void;
   onQuestionChange: (value: string) => void;
   onTopKChange: (value: number) => void;
   onSubmit: () => void;
@@ -17,6 +18,7 @@ export default function QuestionForm({
   topK,
   loading,
   validationError,
+  onStop,
   onQuestionChange,
   onTopKChange,
   onSubmit,
@@ -48,6 +50,10 @@ export default function QuestionForm({
     }
 
     event.preventDefault();
+    if (loading) {
+      onStop();
+      return;
+    }
     if (!canSubmit) {
       return;
     }
@@ -83,9 +89,15 @@ export default function QuestionForm({
               disabled={loading}
             />
           </label>
-          <button type="submit" className="submit-button composer-button" disabled={!canSubmit}>
-            {loading ? "生成中..." : "发送问题"}
-          </button>
+          {loading ? (
+            <button type="button" className="submit-button composer-button stop-button" onClick={onStop}>
+              暂停
+            </button>
+          ) : (
+            <button type="submit" className="submit-button composer-button" disabled={!canSubmit}>
+              发送问题
+            </button>
+          )}
         </div>
       </div>
       {validationError ? <p className="field-error composer-error">{validationError}</p> : null}

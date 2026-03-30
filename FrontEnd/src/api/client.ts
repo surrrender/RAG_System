@@ -16,14 +16,22 @@ interface StreamHandlers {
   onError?: (message: string) => void;
 }
 
+interface StreamOptions {
+  signal?: AbortSignal;
+}
 
-export async function streamQuestion(payload: QARequest, handlers: StreamHandlers): Promise<void> {
+export async function streamQuestion(
+  payload: QARequest,
+  handlers: StreamHandlers,
+  options: StreamOptions = {},
+): Promise<void> {
   const response = await fetch(`${defaultBaseUrl}/qa/stream`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Accept: "text/event-stream",
     },
+    signal: options.signal,
     body: JSON.stringify(payload),
   });
 

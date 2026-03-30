@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { streamQuestion } from "./api/client";
 import ChatMessageList from "./components/ChatMessageList";
@@ -9,6 +9,7 @@ import type { ChatMessage, ConversationTurn } from "./types";
 
 const defaultQuestion = "小程序 App 生命周期是什么？";
 const defaultTopK = 5;
+const scrollTopOffset = 28;
 
 
 export default function App() {
@@ -17,11 +18,42 @@ export default function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
-  const messageEndRef = useRef<HTMLDivElement | null>(null);
+  const composerDockRef = useRef<HTMLDivElement | null>(null);
+  const activeRequestRef = useRef<AbortController | null>(null);
+  const pendingScrollMessageIdRef = useRef<string | null>(null);
+  const [composerHeight, setComposerHeight] = useState(188);
 
-  useEffect(() => {
-    messageEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  useLayoutEffect(() => {
+    const targetMessageId = pendingScrollMessageIdRef.current;
+    if (!targetMessageId) {
+      return;
+    }
+
+    const target = document.querySelector<HTMLElement>(`[data-message-id="${targetMessageId}"]`);
+    if (!target) {
+      return;
+    }
+
+    const nextTop = Math.max(0, target.getBoundingClientRect().top + window.scrollY - scrollTopOffset);
+    window.scrollTo({ top: nextTop, behavior: "smooth" });
+    pendingScrollMessageIdRef.current = null;
   }, [messages]);
+
+  useLayoutEffect(() => {
+    const element = composerDockRef.current;
+    if (!element) {
+      return;
+    }
+
+    const updateHeight = () => {
+      setComposerHeight(element.getBoundingClientRect().height);
+    };
+
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
 
   const handleTopKChange = (value: number) => {
     if (Number.isNaN(value)) {
@@ -42,9 +74,12 @@ export default function App() {
 
     setValidationError(null);
     setLoading(true);
+    setQuestion("");
 
     const userMessage = createMessage("user", normalizedQuestion, "done");
     const assistantMessage = createMessage("assistant", "", "streaming");
+    const requestController = new AbortController();
+    activeRequestRef.current = requestController;
     const history = messages
       .filter((message) => message.role === "user" || message.role === "assistant")
       .filter((message) => message.status !== "error" && message.content.trim())
@@ -53,6 +88,7 @@ export default function App() {
         content: message.content,
       }));
 
+    pendingScrollMessageIdRef.current = userMessage.id;
     setMessages((current) => [...current, userMessage, assistantMessage]);
 
     try {
@@ -107,20 +143,39 @@ export default function App() {
             );
           },
         },
+        { signal: requestController.signal },
       );
-      setQuestion("");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "请求失败，请检查服务状态。";
-      setMessages((current) =>
-        current.map((item) =>
-          item.id === assistantMessage.id
-            ? { ...item, role: "error", content: message, status: "error" }
-            : item,
-        ),
-      );
+      if (isAbortError(error)) {
+        setMessages((current) =>
+          current.map((item) =>
+            item.id === assistantMessage.id
+              ? {
+                  ...item,
+                  content: item.content || "已暂停生成。",
+                  status: "done",
+                }
+              : item,
+          ),
+        );
+      } else {
+        const message = error instanceof Error ? error.message : "请求失败，请检查服务状态。";
+        setMessages((current) =>
+          current.map((item) =>
+            item.id === assistantMessage.id
+              ? { ...item, role: "error", content: message, status: "error" }
+              : item,
+          ),
+        );
+      }
     } finally {
+      activeRequestRef.current = null;
       setLoading(false);
     }
+  };
+
+  const handleStop = () => {
+    activeRequestRef.current?.abort();
   };
 
   const roundCount = useMemo(() => messages.filter((message) => message.role === "user").length, [messages]);
@@ -129,7 +184,7 @@ export default function App() {
     <div className="app-shell">
       <div className="app-bg app-bg-top" />
       <div className="app-bg app-bg-bottom" />
-      <main className="app-layout">
+      <main className="app-layout" style={{ paddingBottom: composerHeight }}>
         <div className="chat-page">
           <div className="chat-column">
             <ChatMessageList messages={messages} loading={loading} />
@@ -144,15 +199,15 @@ export default function App() {
                 当前会话 {roundCount} 轮，模型回复会实时流式写入，并在消息内折叠展示引用来源。
               </p>
             ) : null}
-            <div ref={messageEndRef} />
           </div>
         </div>
-        <div className="composer-dock">
+        <div className="composer-dock" ref={composerDockRef}>
           <QuestionForm
             question={question}
             topK={topK}
             loading={loading}
             validationError={validationError}
+            onStop={handleStop}
             onQuestionChange={(value) => {
               setQuestion(value);
               if (value.trim()) {
@@ -166,6 +221,13 @@ export default function App() {
       </main>
     </div>
   );
+}
+
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException
+    ? error.name === "AbortError"
+    : error instanceof Error && error.name === "AbortError";
 }
 
 

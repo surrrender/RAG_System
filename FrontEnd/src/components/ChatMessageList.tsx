@@ -51,6 +51,7 @@ export default function ChatMessageList({ messages, loading }: ChatMessageListPr
             <article
               className={`message-card message-${message.role} message-${message.status}`}
               key={message.id}
+              data-message-id={message.id}
             >
               <div className="message-meta">
                 <span className="message-role">

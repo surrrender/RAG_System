@@ -79,7 +79,7 @@ a {
   position: relative;
   max-width: 1080px;
   margin: 0 auto;
-  padding: 28px 24px 164px;
+  padding: 28px 24px 0;
 }
 
 .chat-page,
@@ -408,7 +408,7 @@ a {
 .composer-dock {
   position: fixed;
   left: 50%;
-  bottom: 20px;
+  bottom: 0;
   transform: translateX(-50%);
   width: min(100% - 32px, 900px);
   z-index: 5;
@@ -422,7 +422,7 @@ a {
 .composer-panel {
   padding: 16px 16px 14px;
   border: 1px solid rgba(24, 36, 49, 0.08);
-  border-radius: 28px;
+  border-radius: 28px 28px 0 0;
   background: rgba(255, 255, 255, 0.88);
   box-shadow: 0 18px 40px rgba(31, 55, 77, 0.14);
   backdrop-filter: blur(20px);
@@ -477,13 +477,18 @@ a {
   min-width: 92px;
 }
 
+.stop-button {
+  background: linear-gradient(135deg, #996223 0%, #d28a2e 100%);
+  box-shadow: 0 14px 28px rgba(201, 139, 47, 0.22);
+}
+
 .composer-error {
   text-align: center;
 }
 
 @media (max-width: 720px) {
   .app-layout {
-    padding: 20px 16px 172px;
+    padding: 20px 16px 0;
   }
 
   .panel,
@@ -504,7 +509,7 @@ a {
 
   .composer-dock {
     width: calc(100% - 24px);
-    bottom: 12px;
+    bottom: 0;
   }
 
   .message-user,
