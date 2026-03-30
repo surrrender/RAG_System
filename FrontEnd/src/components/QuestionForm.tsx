@@ -1,4 +1,4 @@
-import { FormEvent } from "react";
+import { FormEvent, KeyboardEvent, useLayoutEffect, useRef } from "react";
 
 
 interface QuestionFormProps {
@@ -22,6 +22,17 @@ export default function QuestionForm({
   onSubmit,
 }: QuestionFormProps) {
   const canSubmit = !loading;
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      return;
+    }
+
+    textarea.style.height = "0px";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 180)}px`;
+  }, [question]);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -31,27 +42,37 @@ export default function QuestionForm({
     onSubmit();
   };
 
+  const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== "Enter" || event.shiftKey) {
+      return;
+    }
+
+    event.preventDefault();
+    if (!canSubmit) {
+      return;
+    }
+
+    onSubmit();
+  };
+
   return (
-    <section className="panel panel-form">
-      <div className="panel-header">
-        <p className="eyebrow">提问区</p>
-        <h2>向微信小程序文档发问</h2>
-      </div>
-      <form className="question-form" onSubmit={handleSubmit}>
-        <label className="field">
-          <span className="field-label">问题</span>
-          <textarea
-            name="question"
-            value={question}
-            rows={6}
-            placeholder="例如：小程序 App 生命周期是什么？"
-            onChange={(event) => onQuestionChange(event.target.value)}
-            disabled={loading}
-          />
-        </label>
-        <div className="form-row">
-          <label className="field field-small">
-            <span className="field-label">召回数量 Top K</span>
+    <form className="composer-shell" onSubmit={handleSubmit}>
+      <div className="composer-panel">
+        <textarea
+          className="composer-input"
+          aria-label="问题"
+          name="question"
+          ref={textareaRef}
+          value={question}
+          rows={1}
+          placeholder="给微信小程序文档提问"
+          onChange={(event) => onQuestionChange(event.target.value)}
+          onKeyDown={handleKeyDown}
+          disabled={loading}
+        />
+        <div className="composer-footer">
+          <label className="composer-topk">
+            <span>Top K</span>
             <input
               type="number"
               min={1}
@@ -62,12 +83,12 @@ export default function QuestionForm({
               disabled={loading}
             />
           </label>
-          <button type="submit" className="submit-button" disabled={!canSubmit}>
-            {loading ? "检索中..." : "开始问答"}
+          <button type="submit" className="submit-button composer-button" disabled={!canSubmit}>
+            {loading ? "生成中..." : "发送问题"}
           </button>
         </div>
-        {validationError ? <p className="field-error">{validationError}</p> : null}
-      </form>
-    </section>
+      </div>
+      {validationError ? <p className="field-error composer-error">{validationError}</p> : null}
+    </form>
   );
 }

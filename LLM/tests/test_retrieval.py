@@ -85,3 +85,35 @@ def test_retriever_can_disable_reranker() -> None:
         results = retriever.retrieve("test", top_k=2)
 
     assert results == []
+
+
+def test_retriever_reuses_models_across_requests() -> None:
+    retriever = Retriever(
+        qdrant_path=Path("/tmp/qdrant"),
+        collection_name="demo",
+        embedder_provider="sentence-transformer",
+        embedding_model="BAAI/bge-m3",
+        reranker_provider="cross-encoder",
+        reranker_model="BAAI/bge-reranker-base",
+    )
+    calls = {"embedder": 0, "reranker": 0}
+
+    def fake_build_default_embedder(**_: object) -> str:
+        calls["embedder"] += 1
+        return "EMBEDDER"
+
+    def fake_build_default_reranker(**_: object) -> str:
+        calls["reranker"] += 1
+        return "RERANKER"
+
+    def fake_search_chunks(**_: object) -> list[dict[str, object]]:
+        return []
+
+    with patch(
+        "llm.retrieval.load_embedding_indexing_symbols",
+        return_value=(fake_build_default_embedder, fake_build_default_reranker, fake_search_chunks),
+    ):
+        retriever.retrieve("first", top_k=2)
+        retriever.retrieve("second", top_k=2)
+
+    assert calls == {"embedder": 1, "reranker": 1}

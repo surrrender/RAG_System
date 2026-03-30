@@ -1,6 +1,6 @@
 # Frontend
 
-独立的 React + Vite 前端，用于调用 `LLM` 服务的 `POST /qa` 接口。
+独立的 React + Vite 前端，默认通过 `LLM` 服务的 `POST /qa/stream` 接口消费流式回答。
 
 ## 开发
 

@@ -1,5 +1,5 @@
 from llm.generator import OllamaGenerator
-from llm.models import RetrievedChunk
+from llm.models import ConversationTurn, RetrievedChunk
 from llm.service import EMPTY_RESULT_ANSWER, QAService
 
 
@@ -22,6 +22,11 @@ class StubGenerator:
     def generate(self, prompt: str) -> str:
         self.prompts.append(prompt)
         return self._text
+
+    def generate_stream(self, prompt: str) -> list[str]:
+        self.prompts.append(prompt)
+        midpoint = max(1, len(self._text) // 2)
+        return [self._text[:midpoint], self._text[midpoint:]]
 
 
 def test_service_returns_conservative_answer_when_no_chunks() -> None:
@@ -56,3 +61,46 @@ def test_service_returns_answer_and_citations() -> None:
     assert result.answer == "App 生命周期包括 onLaunch。"
     assert result.citations == chunks
     assert result.retrieval_count == 1
+
+
+def test_service_streams_events_with_history() -> None:
+    chunks = [
+        RetrievedChunk(
+            chunk_id="chunk-1",
+            score=0.8,
+            title="App",
+            url="https://example.com/app",
+            section_path=["生命周期"],
+            text="App 包含 onLaunch。",
+        )
+    ]
+    retriever = StubRetriever(chunks)
+    generator = StubGenerator("App 生命周期包括 onLaunch。")
+    service = QAService(retriever=retriever, generator=generator, max_context_chars=1000)
+
+    events = list(
+        service.stream_answer_question(
+            "App 生命周期是什么？",
+            top_k=3,
+            history=[ConversationTurn(role="user", content="先解释一下 App")],
+        )
+    )
+
+    assert retriever.calls == [("App 生命周期是什么？", 3)]
+    assert events[0]["event"] == "meta"
+    assert [event["event"] for event in events[1:3]] == ["delta", "delta"]
+    assert events[-2]["event"] == "citations"
+    assert events[-1] == {
+        "event": "done",
+        "data": {"answer": "App 生命周期包括 onLaunch。"},
+    }
+    assert "先解释一下 App" in generator.prompts[0]
+
+
+def test_service_streams_empty_result_without_citations() -> None:
+    service = QAService(retriever=StubRetriever([]), generator=StubGenerator("ignored"), max_context_chars=1000)
+
+    events = list(service.stream_answer_question("什么是 App？", top_k=5))
+
+    assert [event["event"] for event in events] == ["meta", "delta", "citations", "done"]
+    assert events[1]["data"]["text"] == EMPTY_RESULT_ANSWER

@@ -17,21 +17,13 @@ class Retriever:
     reranker_model: str
     rerank_candidate_limit: int = 10
     disable_reranker: bool = False
+    _embedder: object | None = None
+    _reranker: object | None = None
 
     def retrieve(self, question: str, top_k: int) -> list[RetrievedChunk]:
-        build_default_embedder, build_default_reranker, search_chunks = load_embedding_indexing_symbols()
-        embedder = build_default_embedder(
-            provider=self.embedder_provider,
-            model_name=self.embedding_model,
-            offline=True,
-        )
-        reranker = None
-        if not self.disable_reranker:
-            reranker = build_default_reranker(
-                provider=self.reranker_provider,
-                model_name=self.reranker_model,
-                offline=True,
-            )
+        _, _, search_chunks = load_embedding_indexing_symbols()
+        embedder = self._get_embedder()
+        reranker = self._get_reranker()
         results = search_chunks(
             qdrant_path=self.qdrant_path,
             collection_name=self.collection_name,
@@ -54,6 +46,28 @@ class Retriever:
             for item in results
         ]
         return sorted(chunks, key=lambda item: item.score, reverse=True)
+
+    def _get_embedder(self) -> object:
+        if self._embedder is None:
+            build_default_embedder, _, _ = load_embedding_indexing_symbols()
+            self._embedder = build_default_embedder(
+                provider=self.embedder_provider,
+                model_name=self.embedding_model,
+                offline=True,
+            )
+        return self._embedder
+
+    def _get_reranker(self) -> object | None:
+        if self.disable_reranker:
+            return None
+        if self._reranker is None:
+            _, build_default_reranker, _ = load_embedding_indexing_symbols()
+            self._reranker = build_default_reranker(
+                provider=self.reranker_provider,
+                model_name=self.reranker_model,
+                offline=True,
+            )
+        return self._reranker
 
 
 def _optional_str(value: object) -> str | None:

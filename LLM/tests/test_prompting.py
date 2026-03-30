@@ -1,4 +1,4 @@
-from llm.models import RetrievedChunk
+from llm.models import ConversationTurn, RetrievedChunk
 from llm.prompting import build_prompt
 
 
@@ -37,3 +37,30 @@ def test_build_prompt_truncates_context() -> None:
     prompt = build_prompt("test", chunks, max_context_chars=120)
 
     assert len(prompt) < 600
+
+
+def test_build_prompt_includes_recent_history() -> None:
+    chunks = [
+        RetrievedChunk(
+            chunk_id="chunk-1",
+            score=0.9,
+            title="App",
+            url="https://example.com/app",
+            section_path=["生命周期", "onLaunch"],
+            text="App 会在小程序初始化时触发 onLaunch。",
+        )
+    ]
+
+    prompt = build_prompt(
+        "App 生命周期是什么？",
+        chunks,
+        max_context_chars=1000,
+        history=[
+            ConversationTurn(role="user", content="先介绍一下 App"),
+            ConversationTurn(role="assistant", content="App 用于注册小程序。"),
+        ],
+    )
+
+    assert "对话历史" in prompt
+    assert "[用户] 先介绍一下 App" in prompt
+    assert "[助手] App 用于注册小程序。" in prompt

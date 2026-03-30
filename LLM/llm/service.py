@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 from llm.config import Settings, load_settings
 from llm.generator import OllamaGenerator
-from llm.models import AnswerResult
+from llm.models import AnswerResult, ConversationTurn, RetrievedChunk
 from llm.prompting import build_prompt
 from llm.retrieval import Retriever
 
@@ -21,12 +23,15 @@ class QAService:
         self._generator = generator
         self._max_context_chars = max_context_chars
 
-    def answer_question(self, question: str, top_k: int) -> AnswerResult:
-        normalized_question = question.strip()
-        if not normalized_question:
-            raise ValueError("Question must not be empty.")
+    def answer_question(
+        self, question: str, top_k: int, history: list[ConversationTurn] | None = None
+    ) -> AnswerResult:
+        normalized_question, chunks, prompt = self._prepare_answer(
+            question=question,
+            top_k=top_k,
+            history=history,
+        )
 
-        chunks = self._retriever.retrieve(normalized_question, top_k=top_k)
         if not chunks:
             return AnswerResult(
                 question=normalized_question,
@@ -36,12 +41,8 @@ class QAService:
                 retrieval_count=0,
             )
 
-        prompt = build_prompt(
-            question=normalized_question,
-            chunks=chunks,
-            max_context_chars=self._max_context_chars,
-        )
         answer = self._generator.generate(prompt)
+
         return AnswerResult(
             question=normalized_question,
             answer=answer,
@@ -49,6 +50,60 @@ class QAService:
             model=self._generator.model,
             retrieval_count=len(chunks),
         )
+
+    def stream_answer_question(
+        self, question: str, top_k: int, history: list[ConversationTurn] | None = None
+    ) -> Iterator[dict[str, object]]:
+        normalized_question, chunks, prompt = self._prepare_answer(
+            question=question,
+            top_k=top_k,
+            history=history,
+        )
+        retrieval_count = len(chunks)
+        yield {
+            "event": "meta",
+            "data": {
+                "question": normalized_question,
+                "model": self._generator.model,
+                "retrieval_count": retrieval_count,
+            },
+        }
+
+        if not chunks:
+            yield {"event": "delta", "data": {"text": EMPTY_RESULT_ANSWER}}
+            yield {"event": "citations", "data": {"citations": []}}
+            yield {"event": "done", "data": {"answer": EMPTY_RESULT_ANSWER}}
+            return
+
+        full_answer = ""
+        for chunk in self._generator.generate_stream(prompt):
+            full_answer += chunk
+            yield {"event": "delta", "data": {"text": chunk}}
+
+        yield {
+            "event": "citations",
+            "data": {"citations": [citation.to_dict() for citation in chunks]},
+        }
+        yield {"event": "done", "data": {"answer": full_answer}}
+
+    def _prepare_answer(
+        self, question: str, top_k: int, history: list[ConversationTurn] | None = None
+    ) -> tuple[str, list[RetrievedChunk], str]:
+        normalized_question = question.strip()
+        if not normalized_question:
+            raise ValueError("Question must not be empty.")
+
+        chunks = self._retriever.retrieve(normalized_question, top_k=top_k)
+        if not chunks:
+            return normalized_question, [], ""
+
+        prompt = build_prompt(
+            question=normalized_question,
+            chunks=chunks,
+            max_context_chars=self._max_context_chars,
+            history=history,
+        )
+        return normalized_question, chunks, prompt
 
 
 def build_service(settings: Settings | None = None) -> QAService:

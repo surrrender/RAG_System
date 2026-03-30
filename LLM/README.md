@@ -34,5 +34,5 @@ python -m llm serve
 默认接口：
 
 ```bash
-POST /qa
+POST /qa/stream
 ```

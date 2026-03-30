@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from llm.models import RetrievedChunk
+from llm.models import ConversationTurn, RetrievedChunk
 
 
 SYSTEM_PROMPT = """你是一个面向微信小程序文档的问答助手。
@@ -9,7 +9,12 @@ SYSTEM_PROMPT = """你是一个面向微信小程序文档的问答助手。
 回答要精准、丰富，优先给出结论，再给出必要说明。"""
 
 
-def build_prompt(question: str, chunks: list[RetrievedChunk], max_context_chars: int) -> str:
+def build_prompt(
+    question: str,
+    chunks: list[RetrievedChunk],
+    max_context_chars: int,
+    history: list[ConversationTurn] | None = None,
+) -> str:
     context_blocks = []
     remaining = max_context_chars
 
@@ -24,8 +29,10 @@ def build_prompt(question: str, chunks: list[RetrievedChunk], max_context_chars:
             remaining -= len(block)
 
     joined_context = "\n\n".join(context_blocks).strip()
+    history_block = _format_history(history or [])
     return (
         f"{SYSTEM_PROMPT}\n\n"
+        f"{history_block}"
         f"用户问题：\n{question.strip()}\n\n"
         f"检索资料：\n{joined_context or '无可用资料'}\n\n"
         "代码格式:如果输出内容中包含代码,请使用``包含单行代码或者```来包含代码片段"
@@ -44,3 +51,18 @@ def _format_chunk(index: int, chunk: RetrievedChunk) -> str:
         f"内容：{(chunk.text or '').strip()}",
     ]
     return "\n".join(lines).strip()
+
+
+def _format_history(history: list[ConversationTurn]) -> str:
+    normalized = [
+        turn for turn in history if turn.role in {"user", "assistant"} and turn.content.strip()
+    ][-6:]
+    if not normalized:
+        return ""
+
+    lines = ["对话历史："]
+    for turn in normalized:
+        speaker = "用户" if turn.role == "user" else "助手"
+        lines.append(f"[{speaker}] {turn.content.strip()}")
+
+    return "\n".join(lines) + "\n\n"
