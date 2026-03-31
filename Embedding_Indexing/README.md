@@ -66,6 +66,7 @@ python -m embedding_indexing index --embedder-provider hash --model-name ignored
 说明：
 
 - `index` 默认允许联网下载模型，因为首次建索引通常需要拉取模型文件
+- `index` 和 `search` 默认都会使用 `cpu` 作为 embedding device，避免在 Apple Silicon 的 `mps` 上因显存不足而失败
 - `search` 默认对 embedding 模型和 reranker 都使用离线模式，只从本地缓存加载模型
 
 ## 输入数据格式
@@ -117,7 +118,8 @@ python -m embedding_indexing index ^
   --collection-name wechat_framework_chunks ^
   --model-name BAAI/bge-m3 ^
   --embedder-provider sentence-transformer ^
-  --batch-size 32 ^
+  --batch-size 8 ^
+  --device cpu ^
   --recreate
 ```
 
@@ -129,6 +131,7 @@ python -m embedding_indexing index ^
 - `--model-name`: embedding 模型名
 - `--embedder-provider`: 当前支持 `sentence-transformer` 和 `hash`
 - `--batch-size`: 批量写入和编码大小
+- `--device`: embedding 设备，支持 `cpu`、`mps`、`cuda`、`auto`
 - `--recreate`: 删除并重建 collection
 - `--hash-dimension`: 仅 `hash` embedder 使用
 - `--offline`: 仅从本地缓存加载模型；适合模型已下载完成后的离线检索
@@ -234,6 +237,7 @@ python -m pytest -o cache_dir=state/.pytest_cache
 - 当前默认只编码 `chunk_text`，代码依赖独立的 `code` chunk 参与召回
 - 当前没有实现“只重建变更 chunk”的增量索引逻辑
 - 首次使用 `BAAI/bge-m3` 或 `BAAI/bge-reranker-base` 会下载模型，耗时取决于网络、磁盘和可用内存
+- 在 Apple Silicon 上如果使用 `mps` 容易遇到显存不足；建议优先使用默认的 `--device cpu`
 - 如果已有旧的 hash 索引或旧 embedding 模型索引，切换到当前默认模型可能会报维度不匹配；需要 `--recreate` 或换新的索引目录/集合
 - `search` 现在会先检查 collection 维度是否和当前模型一致，不一致时会直接给出明确错误
 - 检索接口当前直接对整个集合召回并重排，还没有按 `doc_id` 做聚合或去重

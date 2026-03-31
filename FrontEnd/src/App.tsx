@@ -34,6 +34,8 @@ export default function App() {
       return;
     }
 
+    // TODO:这里的代码是为了让每次用户 submint 之后该问题对应的 chatMessage 置顶,但是现在算法上有些问题,只有第一次符合预期,
+    // 第二个开始就不会置顶了,但是流失输出的回复也不会再输入框的下层,算是部分解决了输入框和会话区域重叠的问题
     const nextTop = Math.max(0, target.getBoundingClientRect().top + window.scrollY - scrollTopOffset);
     window.scrollTo({ top: nextTop, behavior: "smooth" });
     pendingScrollMessageIdRef.current = null;

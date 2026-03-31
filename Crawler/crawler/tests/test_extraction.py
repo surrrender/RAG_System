@@ -35,9 +35,10 @@ def test_extract_page_content() -> None:
 def test_extract_heading_blocks() -> None:
     blocks = extract_heading_blocks(DOC_HTML, CrawlConfig())
     by_path = {tuple(block["section_path"]): block for block in blocks}
-    assert ("App", "注册") in by_path
-    assert "用于注册小程序" in by_path[("App", "注册")]["text"]
-    assert ("App", "注册", "参数") in by_path
+    assert ("注册",) in by_path
+    assert "用于注册小程序" in by_path[("注册",)]["text"]
+    assert by_path[("注册",)]["code_blocks"] == ["App({})"]
+    assert ("注册", "参数") in by_path
 
 
 def test_extract_nav_path_from_breadcrumb_component() -> None:

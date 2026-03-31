@@ -1,5 +1,5 @@
 from crawler.config import CrawlConfig
-from crawler.discovery import extract_framework_links
+from crawler.discovery import extract_framework_links, extract_subnavbar_links
 from crawler.utils import normalize_url
 
 
@@ -10,47 +10,82 @@ def test_normalize_url_strips_query_and_fragment() -> None:
     )
 
 
-def test_extract_framework_links_from_fixture() -> None:
+def test_extract_subnavbar_links_from_framework_page() -> None:
+    html = """
+    <html>
+      <body>
+        <div class="subnavbar">
+          <ul class="subnavbar__list">
+            <li><a href="/miniprogram/dev/framework/">指南</a></li>
+            <li><a href="/miniprogram/dev/reference/">框架</a></li>
+            <li><a href="/miniprogram/dev/component/">组件</a></li>
+            <li><a href="/miniprogram/dev/api/">API</a></li>
+            <li><a href="/miniprogram/dev/server/API/">服务端</a></li>
+          </ul>
+        </div>
+      </body>
+    </html>
+    """
+
+    links = extract_subnavbar_links(html, CrawlConfig())
+
+    assert links == [
+        "https://developers.weixin.qq.com/miniprogram/dev/framework",
+        "https://developers.weixin.qq.com/miniprogram/dev/reference",
+        "https://developers.weixin.qq.com/miniprogram/dev/component",
+        "https://developers.weixin.qq.com/miniprogram/dev/api",
+    ]
+
+
+def test_extract_framework_links_filters_to_same_section() -> None:
     html = """
     <html>
       <body>
         <aside>
-          <div class="menu-group">
-            <div class="menu-title">框架</div>
-            <ul>
-              <li><a href="/miniprogram/dev/reference/api/App.html">App</a></li>
-              <li><a href="/miniprogram/dev/reference/api/Page.html">Page</a></li>
-              <li><a href="/miniprogram/dev/reference/api/Page.html#dup">Page duplicate</a></li>
-            </ul>
-          </div>
+          <a href="/miniprogram/dev/reference/api/App.html">App</a>
+          <a href="/miniprogram/dev/reference/api/Page.html#dup">Page</a>
+          <a href="/miniprogram/dev/component/view.html">Component outside</a>
         </aside>
-        <main>
-          <a href="/miniprogram/dev/reference/api/Outside.html">Outside</a>
-        </main>
-        <main>
-          <a href="/miniprogram/dev/reference/api/Outside.html">Outside</a>
-        </main>
       </body>
     </html>
     """
-    links = extract_framework_links(html, CrawlConfig())
+
+    links = extract_framework_links(
+        html,
+        CrawlConfig(),
+        base_url="https://developers.weixin.qq.com/miniprogram/dev/reference/",
+    )
+
     assert links == [
         "https://developers.weixin.qq.com/miniprogram/dev/reference/api/App.html",
         "https://developers.weixin.qq.com/miniprogram/dev/reference/api/Page.html",
     ]
 
-    
-def test_extract_framework_links_returns_empty_when_sidebar_missing() -> None:
+
+def test_extract_framework_links_supports_framework_section() -> None:
     html = """
     <html>
       <body>
-        <main>
-          <a href="/miniprogram/dev/reference/api/App.html">App</a>
-        </main>
+        <aside>
+          <a href="/miniprogram/dev/framework/quickstart/">快速开始</a>
+          <a href="/miniprogram/dev/framework/config.html">配置</a>
+          <a href="/miniprogram/dev/api/base/wx.canIUse.html">API outside</a>
+        </aside>
       </body>
     </html>
     """
-    assert extract_framework_links(html, CrawlConfig()) == []
+
+    links = extract_framework_links(
+        html,
+        CrawlConfig(),
+        base_url="https://developers.weixin.qq.com/miniprogram/dev/framework/",
+    )
+
+    assert links == [
+        "https://developers.weixin.qq.com/miniprogram/dev/framework/quickstart",
+        "https://developers.weixin.qq.com/miniprogram/dev/framework/config.html",
+    ]
+
 
 def test_extract_framework_links_returns_empty_when_sidebar_missing() -> None:
     html = """
@@ -62,4 +97,5 @@ def test_extract_framework_links_returns_empty_when_sidebar_missing() -> None:
       </body>
     </html>
     """
+
     assert extract_framework_links(html, CrawlConfig()) == []

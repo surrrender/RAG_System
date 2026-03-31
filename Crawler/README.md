@@ -211,7 +211,17 @@ crawl complete: discovered=123 fetched=123 chunks=456 failed=0
 运行测试：
 
 ```bash
+在 `Crawler/` 目录下运行：
+
+```bash
 python -m pytest crawler/tests -o cache_dir=state/.pytest_cache
+```
+
+在仓库根目录运行：
+
+```bash
+python -m pytest Crawler/crawler/tests -o cache_dir=Crawler/state/.pytest_cache
+```
 ```
 
 当前测试覆盖：

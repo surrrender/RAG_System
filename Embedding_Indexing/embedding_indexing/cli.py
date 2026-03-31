@@ -36,6 +36,7 @@ def index(
     recreate: bool = typer.Option(False, help="Delete and recreate the target collection before upsert."),
     hash_dimension: int = typer.Option(64, min=4, help="Only used by the hash embedder."),
     offline: bool = typer.Option(False, help="Load embedding model from local cache only."),
+    device: str = typer.Option("cpu", help="Embedding device: cpu, mps, cuda, or auto."),
 ) -> None:
     qdrant_path.mkdir(parents=True, exist_ok=True)
     embedder = build_default_embedder(
@@ -43,6 +44,7 @@ def index(
         model_name=model_name,
         hash_dimension=hash_dimension,
         offline=offline,
+        device=device,
     )
     stats = index_chunks(
         input_path=input_path,
@@ -69,6 +71,7 @@ def search(
     limit: int = typer.Option(DEFAULT_LIMIT, min=1),
     hash_dimension: int = typer.Option(64, min=4, help="Only used by the hash embedder."),
     offline: bool = typer.Option(True, help="Load embedding model from local cache only."),
+    device: str = typer.Option("cpu", help="Embedding device: cpu, mps, cuda, or auto."),
     reranker_provider: str = typer.Option("cross-encoder"),
     reranker_model_name: str = typer.Option(DEFAULT_RERANKER_MODEL_NAME),
     rerank_candidate_limit: int = typer.Option(DEFAULT_RERANK_CANDIDATE_LIMIT, min=1),
@@ -80,6 +83,7 @@ def search(
         model_name=model_name,
         hash_dimension=hash_dimension,
         offline=offline,
+        device=device,
     )
     reranker = None
     if not disable_reranker:

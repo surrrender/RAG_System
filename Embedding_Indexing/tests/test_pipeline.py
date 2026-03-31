@@ -125,3 +125,57 @@ def test_search_raises_when_reranker_enabled_without_instance() -> None:
             reranker=None,
             enable_reranker=True,
         )
+
+
+def test_index_chunks_embeds_in_batches(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    input_path = tmp_path / "chunks.jsonl"
+    _write_chunks(input_path)
+
+    class RecordingEmbedder:
+        dimension = 8
+
+        def __init__(self) -> None:
+            self.calls: list[list[str]] = []
+
+        def embed_texts(self, texts: list[str]) -> list[list[float]]:
+            self.calls.append(texts.copy())
+            return [[0.0] * self.dimension for _ in texts]
+
+    class FakeIndex:
+        def __init__(self, path: Path, collection_name: str) -> None:
+            self.path = path
+            self.collection_name = collection_name
+            self.upserted: list[tuple[list[str], int]] = []
+
+        def ensure_collection(self, vector_size: int, recreate: bool = False) -> None:
+            assert vector_size == 8
+            assert recreate is True
+
+        def upsert(self, chunks, vectors, batch_size: int = 64) -> None:
+            assert len(chunks) == len(vectors) == batch_size
+            self.upserted.append(([chunk.chunk_id for chunk in chunks], batch_size))
+
+    created_indexes: list[FakeIndex] = []
+
+    def fake_index_factory(path: Path, collection_name: str) -> FakeIndex:
+        index = FakeIndex(path=path, collection_name=collection_name)
+        created_indexes.append(index)
+        return index
+
+    monkeypatch.setattr("embedding_indexing.pipeline.QdrantChunkIndex", fake_index_factory)
+
+    embedder = RecordingEmbedder()
+    stats = index_chunks(
+        input_path=input_path,
+        qdrant_path=tmp_path / "qdrant",
+        collection_name="chunks",
+        embedder=embedder,
+        batch_size=2,
+        recreate=True,
+    )
+
+    assert stats.chunk_count == 3
+    assert len(embedder.calls) == 2
+    assert [len(call) for call in embedder.calls] == [2, 1]
+    assert len(created_indexes) == 1
+    assert created_indexes[0].upserted == [(["c1", "c2"], 2), (["c3"], 1)]

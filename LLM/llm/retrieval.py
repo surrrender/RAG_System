@@ -16,7 +16,7 @@ class Retriever:
     reranker_provider: str
     reranker_model: str
     rerank_candidate_limit: int = 10
-    disable_reranker: bool = False
+    disable_reranker: bool = True
     _embedder: object | None = None
     _reranker: object | None = None
 

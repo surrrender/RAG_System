@@ -7,8 +7,7 @@ import orjson
 from embedding_indexing.models import ChunkRecord
 
 
-def load_chunks(path: Path) -> list[ChunkRecord]:
-    records: list[ChunkRecord] = []
+def iter_chunks(path: Path):
     with path.open("rb") as handle:
         for line_number, raw_line in enumerate(handle, start=1):
             line = raw_line.strip()
@@ -18,5 +17,8 @@ def load_chunks(path: Path) -> list[ChunkRecord]:
                 payload = orjson.loads(line)
             except orjson.JSONDecodeError as exc:
                 raise ValueError(f"Invalid JSONL at line {line_number} in {path}") from exc
-            records.append(ChunkRecord.from_dict(payload))
-    return records
+            yield ChunkRecord.from_dict(payload) # TODO:同样这里采用了逐步返回的策略
+
+
+def load_chunks(path: Path) -> list[ChunkRecord]:
+    return list(iter_chunks(path))

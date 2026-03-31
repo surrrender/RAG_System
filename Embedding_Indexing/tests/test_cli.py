@@ -45,6 +45,7 @@ def test_search_cli_enables_reranker_by_default(monkeypatch) -> None:
         "model_name": "BAAI/bge-reranker-base",
         "offline": True,
     }
+    assert calls["embedder"]["device"] == "cpu"
     assert calls["search"]["enable_reranker"] is True
     assert calls["search"]["rerank_candidate_limit"] == 10
 
@@ -81,3 +82,42 @@ def test_search_cli_can_disable_reranker(monkeypatch) -> None:
     assert result.exit_code == 0
     assert calls["search"]["enable_reranker"] is False
     assert calls["search"]["reranker"] is None
+
+
+def test_index_cli_uses_cpu_device_by_default(monkeypatch) -> None:
+    calls: dict[str, object] = {}
+
+    def fake_embedder(**kwargs):
+        calls["embedder"] = kwargs
+        return object()
+
+    def fake_index_chunks(**kwargs):
+        calls["index"] = kwargs
+        return type(
+            "Stats",
+            (),
+            {
+                "chunk_count": 1,
+                "collection_name": "chunks",
+                "vector_size": 8,
+                "qdrant_path": Path.cwd(),
+            },
+        )()
+
+    input_path = Path(__file__)
+    monkeypatch.setattr(cli, "build_default_embedder", fake_embedder)
+    monkeypatch.setattr(cli, "index_chunks", fake_index_chunks)
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "index",
+            "--input-path",
+            str(input_path),
+            "--qdrant-path",
+            str(Path.cwd()),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert calls["embedder"]["device"] == "cpu"

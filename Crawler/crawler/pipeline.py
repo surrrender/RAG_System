@@ -7,7 +7,7 @@ from playwright.async_api import Browser, BrowserContext, Page, async_playwright
 
 from crawler.chunking import build_chunks
 from crawler.config import CrawlConfig
-from crawler.discovery import extract_framework_links
+from crawler.discovery import extract_framework_links, extract_subnavbar_links
 from crawler.extraction import extract_heading_blocks, extract_page_content, extract_heading_blocks_with_code_and_text_handling_together
 from crawler.models import FailureRecord, PageRecord
 from crawler.storage import ensure_runtime_dirs, load_fingerprints, save_fingerprints, write_jsonl
@@ -37,29 +37,52 @@ async def _new_page(context: BrowserContext, config: CrawlConfig) -> Page:
 
 
 async def discover_urls(context: BrowserContext, config: CrawlConfig) -> list[str]:
-    """Discover and extract URLs from the reference page.
+    """Discover and extract URLs from the framework sections.
 
-    Navigates to the reference URL and extracts framework-specific links
-    from the sidebar container.
+    First navigates to the framework landing page and extracts the target
+    section links from the top subnavbar. Then visits each discovered section
+    and reuses the sidebar extraction logic to collect all crawl targets.
 
     Args:
         context: The browser context to use for navigation.
-        config: The crawl configuration containing reference URL and selectors.
+        config: The crawl configuration containing discovery URLs and selectors.
 
     Returns:
-        A list of normalized URLs discovered from the reference page.
+        A list of normalized URLs discovered from the target sections.
     """
     page = await _new_page(context, config)
     try:
-        await page.goto(config.reference_url, wait_until="networkidle")
+        await page.goto(config.framework_url, wait_until="networkidle")
         await page.wait_for_load_state("domcontentloaded")
-        await page.wait_for_selector(config.selectors.sidebar_container)
-        html = await page.content()
+        await page.wait_for_selector(config.selectors.subnavbar_container)
+        framework_html = await page.content()
     finally:
         await page.close()
 
-    links = extract_framework_links(html, config)
-    return [normalize_url(url, config.reference_url) for url in links]
+    # 首先获取顶边栏的链接
+    section_urls = extract_subnavbar_links(framework_html, config)
+
+    discovered_urls: list[str] = []
+    seen: set[str] = set()
+
+    for section_url in section_urls:
+        page = await _new_page(context, config)
+        try:
+            await page.goto(section_url, wait_until="networkidle")
+            await page.wait_for_load_state("domcontentloaded")
+            await page.wait_for_selector(config.selectors.sidebar_container)
+            html = await page.content()
+        finally:
+            await page.close()
+
+        for url in extract_framework_links(html, config, base_url=section_url):
+            normalized = normalize_url(url, section_url)
+            if normalized not in seen:
+                seen.add(normalized)
+                discovered_urls.append(normalized)
+
+    print('所有的链接:',discovered_urls)
+    return discovered_urls
 
 
 async def _fetch_html(context: BrowserContext, url: str, config: CrawlConfig) -> str:

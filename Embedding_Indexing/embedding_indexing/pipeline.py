@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Iterable
 
 from embedding_indexing.embeddings import BaseEmbedder, build_embedder, chunk_to_embedding_text
-from embedding_indexing.io import load_chunks
+from embedding_indexing.io import iter_chunks
+from embedding_indexing.models import ChunkRecord
 from embedding_indexing.qdrant_store import QdrantChunkIndex
 from embedding_indexing.rerankers import BaseReranker, build_reranker
 
@@ -25,17 +27,18 @@ def index_chunks(
     batch_size: int = 32,
     recreate: bool = True,
 ) -> IndexStats:
-    chunks = load_chunks(input_path)
-    texts = [chunk_to_embedding_text(chunk) for chunk in chunks]
-    # 将文本向量化的地方
-    vectors = embedder.embed_texts(texts)
-
     index = QdrantChunkIndex(path=qdrant_path, collection_name=collection_name)
     index.ensure_collection(vector_size=embedder.dimension, recreate=recreate)
-    index.upsert(chunks=chunks, vectors=vectors, batch_size=batch_size)
+    chunk_count = 0
+
+    for chunk_batch in _batched_chunks(iter_chunks(input_path), batch_size=batch_size):
+        texts = [chunk_to_embedding_text(chunk) for chunk in chunk_batch]
+        vectors = embedder.embed_texts(texts)
+        index.upsert(chunks=chunk_batch, vectors=vectors, batch_size=len(chunk_batch))
+        chunk_count += len(chunk_batch)
 
     return IndexStats(
-        chunk_count=len(chunks),
+        chunk_count=chunk_count,
         vector_size=embedder.dimension,
         collection_name=collection_name,
         qdrant_path=qdrant_path,
@@ -73,12 +76,14 @@ def build_default_embedder(
     model_name: str,
     hash_dimension: int = 32,
     offline: bool = False,
+    device: str = "cpu",
 ) -> BaseEmbedder:
     return build_embedder(
         provider=provider,
         model_name=model_name,
         hash_dimension=hash_dimension,
         offline=offline,
+        device=device,
     )
 
 
@@ -121,3 +126,15 @@ def _point_to_result(point: object, score: float | None = None) -> dict[str, obj
         "chunk_type": point.payload.get("chunk_type"),
         "chunk_text": point.payload.get("text"),
     }
+
+
+# TODO:这里实现了一个批处理生成器,作用是将所有的 chunk 分配进行处理而非一次性导入
+def _batched_chunks(chunks: Iterable[ChunkRecord], batch_size: int) -> Iterable[list[ChunkRecord]]:
+    batch: list[ChunkRecord] = []
+    for chunk in chunks:
+        batch.append(chunk)
+        if len(batch) >= batch_size:
+            yield batch # yield:逐个返回,保存当前状态
+            batch = []
+    if batch:
+        yield batch

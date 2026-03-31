@@ -12,6 +12,7 @@ def utc_now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
+# 将可能的相对路径转化为绝对路径
 def normalize_url(url: str, base_url: str = SITE_ROOT) -> str:
     absolute = urljoin(base_url, url.strip())
     parsed = urlparse(absolute)
