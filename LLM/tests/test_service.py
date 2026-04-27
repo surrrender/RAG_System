@@ -7,6 +7,10 @@ class StubRetriever:
     def __init__(self, chunks: list[RetrievedChunk]) -> None:
         self._chunks = chunks
         self.calls: list[tuple[str, int]] = []
+        self.warm_up_calls = 0
+
+    def warm_up(self) -> None:
+        self.warm_up_calls += 1
 
     def retrieve(self, question: str, top_k: int) -> list[RetrievedChunk]:
         self.calls.append((question, top_k))
@@ -37,6 +41,15 @@ def test_service_returns_conservative_answer_when_no_chunks() -> None:
     assert result.answer == EMPTY_RESULT_ANSWER
     assert result.citations == []
     assert result.retrieval_count == 0
+
+
+def test_service_warm_up_initializes_retriever() -> None:
+    retriever = StubRetriever([])
+    service = QAService(retriever=retriever, generator=StubGenerator("ignored"), max_context_chars=1000)
+
+    service.warm_up()
+
+    assert retriever.warm_up_calls == 1
 
 
 def test_service_returns_answer_and_citations() -> None:

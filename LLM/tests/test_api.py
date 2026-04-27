@@ -11,6 +11,10 @@ class StubService:
     def __init__(self) -> None:
         self.calls: list[tuple[str, int, list[dict[str, str]]]] = []
         self.stream_calls: list[tuple[str, int, list[dict[str, str]]]] = []
+        self.warm_up_calls = 0
+
+    def warm_up(self) -> None:
+        self.warm_up_calls += 1
 
     def answer_question(self, question: str, top_k: int, history: list[object] | None = None) -> AnswerResult:
         normalized_history = [
@@ -79,6 +83,14 @@ def _create_client(tmp_path: Path) -> tuple[TestClient, ConversationStore]:
     client = TestClient(create_app(service=service, store=store))
     client.app.state.stub_service = service
     return client, store
+
+
+def test_app_warms_up_service_on_startup(tmp_path: Path) -> None:
+    service = StubService()
+    store = ConversationStore(tmp_path / "app.sqlite3")
+
+    with TestClient(create_app(service=service, store=store)):
+        assert service.warm_up_calls == 1
 
 
 def test_conversation_crud_and_user_isolation(tmp_path: Path) -> None:

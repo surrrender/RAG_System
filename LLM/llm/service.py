@@ -24,6 +24,9 @@ class QAService:
         self._generator = generator
         self._max_context_chars = max_context_chars
 
+    def warm_up(self) -> None:
+        self._retriever.warm_up()
+
     def answer_question(
         self, question: str, top_k: int, history: list[ConversationTurn] | None = None
     ) -> AnswerResult:

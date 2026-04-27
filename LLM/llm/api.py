@@ -1,10 +1,14 @@
 import json
+import logging
+from contextlib import asynccontextmanager
 from typing import Any
 
 from llm.config import Settings, load_settings
 from llm.models import Citation, ConversationSummary, ConversationTurn, StoredMessage
 from llm.service import QAService, build_service
 from llm.storage import ConversationNotFoundError, ConversationStore
+
+logger = logging.getLogger(__name__)
 
 
 def create_app(
@@ -24,7 +28,18 @@ def create_app(
     current = settings or load_settings()
     qa_service = service or build_service(current)
     conversation_store = store or ConversationStore(current.sqlite_path)
-    app = FastAPI(title="Local RAG QA API", version="0.1.0")
+    
+    @asynccontextmanager
+    async def lifespan(_: Any):
+        warm_up = getattr(qa_service, "warm_up", None)
+        if callable(warm_up):
+            try:
+                warm_up()
+            except Exception:  # pragma: no cover - startup warmup failure is environment-dependent
+                logger.exception("QA service warm-up failed during startup.")
+        yield
+
+    app = FastAPI(title="Local RAG QA API", version="0.1.0", lifespan=lifespan)
 
     class HistoryTurn(BaseModel):
         role: str

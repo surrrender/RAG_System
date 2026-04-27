@@ -24,6 +24,10 @@ class Retriever:
     _reranker: object | None = None
     _reranker_unavailable: bool = False
 
+    def warm_up(self) -> None:
+        self._get_embedder()
+        self._get_reranker()
+
     def retrieve(self, question: str, top_k: int) -> list[RetrievedChunk]:
         _, _, search_chunks = load_embedding_indexing_symbols()
         embedder = self._get_embedder()
