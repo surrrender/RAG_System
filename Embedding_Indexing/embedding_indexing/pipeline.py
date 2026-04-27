@@ -22,12 +22,19 @@ class IndexStats:
 def index_chunks(
     input_path: Path,
     qdrant_path: Path,
+    qdrant_url: str | None,
+    qdrant_api_key: str | None,
     collection_name: str,
     embedder: BaseEmbedder,
     batch_size: int = 32,
     recreate: bool = True,
 ) -> IndexStats:
-    index = QdrantChunkIndex(path=qdrant_path, collection_name=collection_name)
+    index = QdrantChunkIndex(
+        path=qdrant_path,
+        collection_name=collection_name,
+        url=qdrant_url,
+        api_key=qdrant_api_key,
+    )
     index.ensure_collection(vector_size=embedder.dimension, recreate=recreate)
     chunk_count = 0
 
@@ -47,6 +54,8 @@ def index_chunks(
 
 def search_chunks(
     qdrant_path: Path,
+    qdrant_url: str | None,
+    qdrant_api_key: str | None,
     collection_name: str,
     embedder: BaseEmbedder,
     query: str,
@@ -58,7 +67,12 @@ def search_chunks(
     if enable_reranker and reranker is None:
         raise ValueError("Reranker is enabled, but no reranker instance was provided.")
 
-    index = QdrantChunkIndex(path=qdrant_path, collection_name=collection_name)
+    index = QdrantChunkIndex(
+        path=qdrant_path,
+        collection_name=collection_name,
+        url=qdrant_url,
+        api_key=qdrant_api_key,
+    )
     index.ensure_collection(vector_size=embedder.dimension, recreate=False)
     query_vector = embedder.embed_query(query)
     candidate_limit = max(limit, rerank_candidate_limit)

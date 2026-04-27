@@ -1,0 +1,20 @@
+# 每行一个问题
+微信小程序的 app.json 有哪些常用配置项？
+    
+小程序页面生命周期和应用生命周期分别有哪些？
+    
+WXML 的数据绑定语法如何使用？
+    
+wx:if 和 hidden 的区别是什么？
+    
+小程序中如何使用自定义组件？
+    
+自定义组件的 properties、data 和 methods 分别有什么作用？
+    
+小程序如何进行页面跳转？navigateTo、redirectTo、switchTab 有什么区别？
+    
+wx.request 的使用限制和域名配置要求是什么？
+    
+小程序如何获取用户登录凭证 code？
+    
+wx.login 和 wx.getUserProfile 的关系是什么？

@@ -77,15 +77,156 @@ a {
 
 .app-layout {
   position: relative;
-  max-width: 1080px;
+  max-width: 1320px;
   margin: 0 auto;
   padding: 28px 24px 0;
 }
 
+.workspace-grid {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
 .chat-page,
-.chat-column {
+.chat-column,
+.conversation-list,
+.conversation-sidebar {
   display: grid;
   gap: 16px;
+}
+
+.conversation-sidebar {
+  position: sticky;
+  top: 28px;
+}
+
+.conversation-sidebar-header,
+.conversation-card-actions,
+.conversation-card-button {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.conversation-sidebar-title {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.sidebar-action-button,
+.conversation-card-actions button {
+  border: 1px solid rgba(24, 36, 49, 0.1);
+  background: rgba(255, 255, 255, 0.9);
+  color: #223340;
+  border-radius: 14px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.conversation-card {
+  border: 1px solid rgba(24, 36, 49, 0.08);
+  border-radius: 18px;
+  background: rgba(250, 252, 252, 0.94);
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.conversation-card-active {
+  border-color: rgba(18, 108, 105, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(18, 108, 105, 0.08);
+}
+
+.conversation-card-button {
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  align-items: start;
+  cursor: pointer;
+}
+
+.conversation-card-button strong {
+  font-size: 1rem;
+  color: #182431;
+}
+
+.conversation-card-button span {
+  color: var(--muted);
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.performance-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.performance-panel-header,
+.performance-section-header,
+.performance-aggregate-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: start;
+}
+
+.performance-title {
+  margin: 0;
+  font-size: 1.3rem;
+}
+
+.performance-count,
+.performance-section-header span,
+.performance-card span,
+.performance-aggregate-row span {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.performance-section {
+  display: grid;
+  gap: 12px;
+}
+
+.performance-section-header h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.performance-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.performance-card {
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(248, 250, 248, 0.94);
+  border: 1px solid rgba(24, 36, 49, 0.08);
+  display: grid;
+  gap: 8px;
+}
+
+.performance-card strong,
+.performance-aggregate-row strong {
+  color: #223340;
+  font-size: 0.98rem;
+}
+
+.performance-aggregate-list {
+  display: grid;
+  gap: 10px;
+}
+
+.performance-aggregate-row {
+  padding-top: 10px;
+  border-top: 1px solid rgba(24, 36, 49, 0.08);
 }
 
 .panel {
@@ -188,6 +329,16 @@ a {
 .chat-footnote {
   margin: 0;
   color: var(--muted);
+}
+
+@media (max-width: 960px) {
+  .workspace-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .conversation-sidebar {
+    position: static;
+  }
 }
 
 .chat-footnote {
@@ -498,6 +649,9 @@ a {
   }
 
   .chat-toolbar,
+  .performance-panel-header,
+  .performance-section-header,
+  .performance-aggregate-row,
   .citation-topline,
   .citation-footer,
   .message-meta,

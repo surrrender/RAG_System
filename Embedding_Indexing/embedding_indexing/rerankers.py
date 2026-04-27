@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from contextlib import contextmanager
 from abc import ABC, abstractmethod
 
 
@@ -23,11 +24,12 @@ class CrossEncoderReranker(BaseReranker):
         if offline:
             os.environ["HF_HUB_OFFLINE"] = "1"
 
-        self._model = CrossEncoder(
-            model_name,
-            trust_remote_code=True,
-            local_files_only=offline,
-        )
+        with _proxy_guard(enabled=offline):
+            self._model = CrossEncoder(
+                model_name,
+                trust_remote_code=True,
+                local_files_only=offline,
+            )
 
     def rerank(self, query: str, documents: list[str]) -> list[float]:
         if not documents:
@@ -42,3 +44,26 @@ def build_reranker(provider: str, model_name: str, offline: bool = False) -> Bas
     if provider == "cross-encoder":
         return CrossEncoderReranker(model_name=model_name, offline=offline)
     raise ValueError(f"Unsupported reranker provider: {provider}")
+
+
+@contextmanager
+def _proxy_guard(enabled: bool):
+    if not enabled:
+        yield
+        return
+
+    proxy_keys = (
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "ALL_PROXY",
+        "http_proxy",
+        "https_proxy",
+        "all_proxy",
+    )
+    snapshot = {key: os.environ.pop(key, None) for key in proxy_keys}
+    try:
+        yield
+    finally:
+        for key, value in snapshot.items():
+            if value is not None:
+                os.environ[key] = value

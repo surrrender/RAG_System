@@ -11,7 +11,9 @@ from embedding_indexing.config import (
     DEFAULT_INPUT_PATH,
     DEFAULT_LIMIT,
     DEFAULT_MODEL_NAME,
+    DEFAULT_QDRANT_API_KEY,
     DEFAULT_QDRANT_PATH,
+    DEFAULT_QDRANT_URL,
     DEFAULT_RERANK_CANDIDATE_LIMIT,
     DEFAULT_RERANKER_MODEL_NAME,
 )
@@ -29,6 +31,8 @@ app = typer.Typer(help="Embedding and local Qdrant indexing for chunked docs.")
 def index(
     input_path: Path = typer.Option(DEFAULT_INPUT_PATH, exists=True, file_okay=True, dir_okay=False),
     qdrant_path: Path = typer.Option(DEFAULT_QDRANT_PATH),
+    qdrant_url: str | None = typer.Option(DEFAULT_QDRANT_URL),
+    qdrant_api_key: str | None = typer.Option(DEFAULT_QDRANT_API_KEY),
     collection_name: str = typer.Option(DEFAULT_COLLECTION_NAME),
     model_name: str = typer.Option(DEFAULT_MODEL_NAME),
     embedder_provider: str = typer.Option("sentence-transformer"),
@@ -38,7 +42,8 @@ def index(
     offline: bool = typer.Option(False, help="Load embedding model from local cache only."),
     device: str = typer.Option("cpu", help="Embedding device: cpu, mps, cuda, or auto."),
 ) -> None:
-    qdrant_path.mkdir(parents=True, exist_ok=True)
+    if not qdrant_url:
+        qdrant_path.mkdir(parents=True, exist_ok=True)
     embedder = build_default_embedder(
         provider=embedder_provider,
         model_name=model_name,
@@ -49,6 +54,8 @@ def index(
     stats = index_chunks(
         input_path=input_path,
         qdrant_path=qdrant_path,
+        qdrant_url=qdrant_url,
+        qdrant_api_key=qdrant_api_key,
         collection_name=collection_name,
         embedder=embedder,
         batch_size=batch_size,
@@ -64,7 +71,9 @@ def index(
 @app.command()
 def search(
     query: str,
-    qdrant_path: Path = typer.Option(DEFAULT_QDRANT_PATH, exists=True),
+    qdrant_path: Path = typer.Option(DEFAULT_QDRANT_PATH),
+    qdrant_url: str | None = typer.Option(DEFAULT_QDRANT_URL),
+    qdrant_api_key: str | None = typer.Option(DEFAULT_QDRANT_API_KEY),
     collection_name: str = typer.Option(DEFAULT_COLLECTION_NAME),
     model_name: str = typer.Option(DEFAULT_MODEL_NAME),
     embedder_provider: str = typer.Option("sentence-transformer"),
@@ -78,6 +87,8 @@ def search(
     reranker_offline: bool = typer.Option(True, help="Load reranker model from local cache only."),
     disable_reranker: bool = typer.Option(False, help="Skip reranking and return dense retrieval results."),
 ) -> None:
+    if not qdrant_url and not qdrant_path.exists():
+        raise typer.BadParameter("qdrant_path does not exist when qdrant_url is not configured.")
     embedder = build_default_embedder(
         provider=embedder_provider,
         model_name=model_name,
@@ -94,6 +105,8 @@ def search(
         )
     results = search_chunks(
         qdrant_path=qdrant_path,
+        qdrant_url=qdrant_url,
+        qdrant_api_key=qdrant_api_key,
         collection_name=collection_name,
         embedder=embedder,
         query=query,

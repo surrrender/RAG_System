@@ -28,4 +28,9 @@ outputs/
 Embedding_Indexing/data/qdrant
 Embedding_Indexing/data/qdrant_bge_small
 
+LLM/data/
+
 FrontEnd/node_modules
+FrontEnd/.npm-cache
+FrontEnd/.playwright-browsers
+FrontEnd/test-results/

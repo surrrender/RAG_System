@@ -36,3 +36,51 @@ python -m llm serve
 ```bash
 POST /qa/stream
 ```
+
+## 多用户与多会话
+
+当前 HTTP API 已支持轻量 `user_id` + `conversation_id` 的多用户多会话模式。
+
+主要接口：
+
+```bash
+GET    /conversations?user_id=...
+POST   /conversations
+PATCH  /conversations/{conversation_id}
+DELETE /conversations/{conversation_id}?user_id=...
+GET    /conversations/{conversation_id}/messages?user_id=...
+POST   /qa
+POST   /qa/stream
+```
+
+`/qa` 与 `/qa/stream` 请求体现在都需要：
+
+```json
+{
+  "user_id": "browser-local-user-id",
+  "conversation_id": "uuid",
+  "question": "小程序 App 生命周期是什么？",
+  "top_k": 5
+}
+```
+
+会话与消息历史默认存储在本地 SQLite：
+
+```bash
+LLM_SQLITE_PATH=/absolute/path/to/app.sqlite3
+```
+
+## Qdrant 配置
+
+默认仍然兼容本地目录模式：
+
+```bash
+LLM_QDRANT_PATH=./Embedding_Indexing/data/qdrant
+```
+
+如果要切到多人并发更适合的 Qdrant server 模式，可以改为：
+
+```bash
+LLM_QDRANT_URL=http://127.0.0.1:6333
+LLM_QDRANT_API_KEY=optional-api-key
+```

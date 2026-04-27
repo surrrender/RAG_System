@@ -61,6 +61,8 @@ def test_index_and_search_round_trip() -> None:
         stats = index_chunks(
             input_path=input_path,
             qdrant_path=qdrant_path,
+            qdrant_url=None,
+            qdrant_api_key=None,
             collection_name="chunks",
             embedder=HashEmbedder(dimension=48),
             recreate=True,
@@ -68,6 +70,8 @@ def test_index_and_search_round_trip() -> None:
 
         results = search_chunks(
             qdrant_path=qdrant_path,
+            qdrant_url=None,
+            qdrant_api_key=None,
             collection_name="chunks",
             embedder=HashEmbedder(dimension=48),
             query="app launch lifecycle",
@@ -96,6 +100,8 @@ def test_search_can_disable_reranker() -> None:
         index_chunks(
             input_path=input_path,
             qdrant_path=qdrant_path,
+            qdrant_url=None,
+            qdrant_api_key=None,
             collection_name="chunks",
             embedder=HashEmbedder(dimension=48),
             recreate=True,
@@ -103,6 +109,8 @@ def test_search_can_disable_reranker() -> None:
 
         results = search_chunks(
             qdrant_path=qdrant_path,
+            qdrant_url=None,
+            qdrant_api_key=None,
             collection_name="chunks",
             embedder=HashEmbedder(dimension=48),
             query="app launch lifecycle",
@@ -118,6 +126,8 @@ def test_search_raises_when_reranker_enabled_without_instance() -> None:
     with pytest.raises(ValueError, match="Reranker is enabled"):
         search_chunks(
             qdrant_path=Path("unused"),
+            qdrant_url=None,
+            qdrant_api_key=None,
             collection_name="chunks",
             embedder=HashEmbedder(dimension=8),
             query="app launch lifecycle",
@@ -157,7 +167,9 @@ def test_index_chunks_embeds_in_batches(monkeypatch: pytest.MonkeyPatch, tmp_pat
 
     created_indexes: list[FakeIndex] = []
 
-    def fake_index_factory(path: Path, collection_name: str) -> FakeIndex:
+    def fake_index_factory(path: Path, collection_name: str, url: str | None = None, api_key: str | None = None) -> FakeIndex:
+        assert url is None
+        assert api_key is None
         index = FakeIndex(path=path, collection_name=collection_name)
         created_indexes.append(index)
         return index
@@ -168,6 +180,8 @@ def test_index_chunks_embeds_in_batches(monkeypatch: pytest.MonkeyPatch, tmp_pat
     stats = index_chunks(
         input_path=input_path,
         qdrant_path=tmp_path / "qdrant",
+        qdrant_url=None,
+        qdrant_api_key=None,
         collection_name="chunks",
         embedder=embedder,
         batch_size=2,

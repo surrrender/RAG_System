@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -10,28 +11,34 @@ from llm.models import RetrievedChunk
 @dataclass(slots=True)
 class Retriever:
     qdrant_path: Path
+    qdrant_url: str | None
+    qdrant_api_key: str | None
     collection_name: str
     embedder_provider: str
     embedding_model: str
     reranker_provider: str
     reranker_model: str
     rerank_candidate_limit: int = 10
-    disable_reranker: bool = True
+    disable_reranker: bool = False
     _embedder: object | None = None
     _reranker: object | None = None
+    _reranker_unavailable: bool = False
 
     def retrieve(self, question: str, top_k: int) -> list[RetrievedChunk]:
         _, _, search_chunks = load_embedding_indexing_symbols()
         embedder = self._get_embedder()
         reranker = self._get_reranker()
+        enable_reranker = reranker is not None and not self.disable_reranker
         results = search_chunks(
             qdrant_path=self.qdrant_path,
+            qdrant_url=self.qdrant_url,
+            qdrant_api_key=self.qdrant_api_key,
             collection_name=self.collection_name,
             embedder=embedder,
             query=question,
             limit=top_k,
             reranker=reranker,
-            enable_reranker=not self.disable_reranker,
+            enable_reranker=enable_reranker,
             rerank_candidate_limit=self.rerank_candidate_limit,
         )
         chunks = [
@@ -58,15 +65,27 @@ class Retriever:
         return self._embedder
 
     def _get_reranker(self) -> object | None:
-        if self.disable_reranker:
+        if self.disable_reranker or self._reranker_unavailable:
             return None
         if self._reranker is None:
             _, build_default_reranker, _ = load_embedding_indexing_symbols()
-            self._reranker = build_default_reranker(
-                provider=self.reranker_provider,
-                model_name=self.reranker_model,
-                offline=True,
-            )
+            try:
+                self._reranker = build_default_reranker(
+                    provider=self.reranker_provider,
+                    model_name=self.reranker_model,
+                    offline=True,
+                )
+            except Exception as exc:
+                self._reranker_unavailable = True
+                warnings.warn(
+                    (
+                        f"Reranker '{self.reranker_model}' is unavailable; "
+                        f"falling back to dense retrieval only. Original error: {exc}"
+                    ),
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+                return None
         return self._reranker
 
 

@@ -6,6 +6,8 @@ import MarkdownRenderer from "./MarkdownRenderer";
 interface ChatMessageListProps {
   messages: ChatMessage[];
   loading: boolean;
+  title: string;
+  userId: string;
 }
 
 
@@ -18,14 +20,14 @@ function truncateText(text: string): string {
 }
 
 
-export default function ChatMessageList({ messages, loading }: ChatMessageListProps) {
+export default function ChatMessageList({ messages, loading, title, userId }: ChatMessageListProps) {
   if (!messages.length) {
     return (
       <section className="chat-panel chat-empty-state">
         <p className="eyebrow">RAG Chat</p>
-        <h1 className="chat-title">微信小程序文档问答台</h1>
+        <h1 className="chat-title">{title}</h1>
         <p className="chat-empty-copy">
-          在下方输入问题后，回答会像 ChatGPT 一样从这里向上展开，并在每条消息内附带引用来源。
+          当前用户标识 `{userId.slice(0, 8)}`，在下方输入问题后，回答会像 ChatGPT 一样从这里向上展开，并在每条消息内附带引用来源。
         </p>
         {loading ? <span className="chat-live-indicator">流式生成中</span> : null}
       </section>
@@ -37,7 +39,7 @@ export default function ChatMessageList({ messages, loading }: ChatMessageListPr
       <div className="chat-toolbar">
         <div>
           <p className="eyebrow">RAG Chat</p>
-          <h1 className="chat-title">微信小程序文档问答台</h1>
+          <h1 className="chat-title">{title}</h1>
         </div>
         {loading ? <span className="chat-live-indicator">流式生成中</span> : null}
       </div>

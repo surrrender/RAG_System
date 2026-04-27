@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import uuid
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 
 from embedding_indexing.models import ChunkRecord
+
+
+LOCAL_HOSTS = {"127.0.0.1", "localhost", "0.0.0.0"}
 
 
 def chunk_to_payload(chunk: ChunkRecord) -> dict[str, object]:
@@ -28,7 +32,13 @@ def chunk_to_point_id(chunk_id: str) -> str:
 
 
 class QdrantChunkIndex:
-    def __init__(self, path: Path, collection_name: str) -> None:
+    def __init__(
+        self,
+        path: Path,
+        collection_name: str,
+        url: str | None = None,
+        api_key: str | None = None,
+    ) -> None:
         try:
             from qdrant_client import QdrantClient
             from qdrant_client.http import models as rest
@@ -40,10 +50,17 @@ class QdrantChunkIndex:
 
         self.collection_name = collection_name
         self._rest = rest
-        self.client = QdrantClient(path=str(path))
+        if url:
+            normalized_url = _normalize_local_service_url(url) or url
+            self.client = QdrantClient(url=normalized_url, api_key=api_key)
+        else:
+            self.client = QdrantClient(path=str(path))
 
     def ensure_collection(self, vector_size: int, recreate: bool = False) -> None:
-        exists = self.client.collection_exists(self.collection_name)
+        try:
+            exists = self.client.collection_exists(self.collection_name)
+        except Exception as exc:
+            raise RuntimeError(self._build_connection_error(exc)) from exc
         if exists and recreate:
             self.client.delete_collection(self.collection_name)
             exists = False
@@ -55,7 +72,10 @@ class QdrantChunkIndex:
             )
             return
 
-        collection_info = self.client.get_collection(self.collection_name)
+        try:
+            collection_info = self.client.get_collection(self.collection_name)
+        except Exception as exc:
+            raise RuntimeError(self._build_connection_error(exc)) from exc
         configured_vectors = collection_info.config.params.vectors
         current_size = getattr(configured_vectors, "size", None)
         if current_size is None:
@@ -82,7 +102,10 @@ class QdrantChunkIndex:
                 self._rest.PointStruct(id=chunk_to_point_id(chunk.chunk_id), vector=vector, payload=chunk_to_payload(chunk))
                 for chunk, vector in zip(batch_chunks, batch_vectors, strict=True)
             ]
-            self.client.upsert(collection_name=self.collection_name, points=points)
+            try:
+                self.client.upsert(collection_name=self.collection_name, points=points)
+            except Exception as exc:
+                raise RuntimeError(self._build_connection_error(exc)) from exc
 
     def search(
         self,
@@ -101,10 +124,47 @@ class QdrantChunkIndex:
                 ]
             )
 
-        return self.client.query_points(
-            collection_name=self.collection_name,
-            query=query_vector,
-            limit=limit,
-            with_payload=True,
-            query_filter=query_filter,
-        ).points
+        try:
+            return self.client.query_points(
+                collection_name=self.collection_name,
+                query=query_vector,
+                limit=limit,
+                with_payload=True,
+                query_filter=query_filter,
+            ).points
+        except Exception as exc:
+            raise RuntimeError(self._build_connection_error(exc)) from exc
+
+    def _build_connection_error(self, exc: Exception) -> str:
+        url = getattr(self.client, "url", None)
+        return f"Failed to reach Qdrant: {exc}. {_protocol_hint(url, 'Qdrant')}"
+
+
+def _normalize_local_service_url(url: str | None) -> str | None:
+    if url is None:
+        return None
+
+    trimmed = url.strip()
+    if not trimmed:
+        return None
+
+    parsed = urlsplit(trimmed)
+    hostname = (parsed.hostname or "").lower()
+    if parsed.scheme == "https" and hostname in LOCAL_HOSTS:
+        return urlunsplit(("http", parsed.netloc, parsed.path, parsed.query, parsed.fragment))
+    return trimmed
+
+
+def _protocol_hint(url: str | None, service_name: str) -> str:
+    normalized = _normalize_local_service_url(url)
+    if not normalized:
+        return f"{service_name} connection failed."
+
+    parsed = urlsplit(normalized)
+    host = parsed.hostname or normalized
+    if host.lower() in LOCAL_HOSTS:
+        return (
+            f"{service_name} connection failed. Check whether the service is running and whether "
+            f"the URL scheme should be http:// instead of https://."
+        )
+    return f"{service_name} connection failed. Check whether the configured URL is reachable."

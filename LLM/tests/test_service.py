@@ -88,12 +88,15 @@ def test_service_streams_events_with_history() -> None:
 
     assert retriever.calls == [("App 生命周期是什么？", 3)]
     assert events[0]["event"] == "meta"
+    assert events[0]["data"]["server_started_at_ms"] == 0.0
+    assert isinstance(events[0]["data"]["retrieval_finished_at_ms"], float)
     assert [event["event"] for event in events[1:3]] == ["delta", "delta"]
+    assert isinstance(events[1]["data"]["server_first_token_at_ms"], float)
+    assert "server_first_token_at_ms" not in events[2]["data"]
     assert events[-2]["event"] == "citations"
-    assert events[-1] == {
-        "event": "done",
-        "data": {"answer": "App 生命周期包括 onLaunch。"},
-    }
+    assert events[-1]["event"] == "done"
+    assert events[-1]["data"]["answer"] == "App 生命周期包括 onLaunch。"
+    assert isinstance(events[-1]["data"]["server_completed_at_ms"], float)
     assert "先解释一下 App" in generator.prompts[0]
 
 
@@ -104,3 +107,5 @@ def test_service_streams_empty_result_without_citations() -> None:
 
     assert [event["event"] for event in events] == ["meta", "delta", "citations", "done"]
     assert events[1]["data"]["text"] == EMPTY_RESULT_ANSWER
+    assert isinstance(events[1]["data"]["server_first_token_at_ms"], float)
+    assert isinstance(events[-1]["data"]["server_completed_at_ms"], float)

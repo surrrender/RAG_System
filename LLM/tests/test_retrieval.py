@@ -7,6 +7,8 @@ from llm.retrieval import Retriever
 def test_retriever_normalizes_results() -> None:
     retriever = Retriever(
         qdrant_path=Path("/tmp/qdrant"),
+        qdrant_url=None,
+        qdrant_api_key=None,
         collection_name="demo",
         embedder_provider="sentence-transformer",
         embedding_model="BAAI/bge-m3",
@@ -29,6 +31,7 @@ def test_retriever_normalizes_results() -> None:
     def fake_search_chunks(**kwargs: object) -> list[dict[str, object]]:
         assert kwargs["embedder"] == "EMBEDDER"
         assert kwargs["reranker"] == "RERANKER"
+        assert kwargs["qdrant_url"] is None
         assert kwargs["enable_reranker"] is True
         assert kwargs["rerank_candidate_limit"] == 10
         assert kwargs["query"] == "test"
@@ -59,6 +62,8 @@ def test_retriever_normalizes_results() -> None:
 def test_retriever_can_disable_reranker() -> None:
     retriever = Retriever(
         qdrant_path=Path("/tmp/qdrant"),
+        qdrant_url=None,
+        qdrant_api_key=None,
         collection_name="demo",
         embedder_provider="sentence-transformer",
         embedding_model="BAAI/bge-m3",
@@ -90,6 +95,8 @@ def test_retriever_can_disable_reranker() -> None:
 def test_retriever_reuses_models_across_requests() -> None:
     retriever = Retriever(
         qdrant_path=Path("/tmp/qdrant"),
+        qdrant_url=None,
+        qdrant_api_key=None,
         collection_name="demo",
         embedder_provider="sentence-transformer",
         embedding_model="BAAI/bge-m3",

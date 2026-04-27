@@ -1,0 +1,23 @@
+[
+  {
+    "time_to_first_visible_char_ms": 72.8,
+    "time_to_full_visible_answer_ms": 206.2,
+    "server_retrieval_ms": 18,
+    "server_time_to_first_token_ms": 64,
+    "server_total_ms": 192
+  },
+  {
+    "time_to_first_visible_char_ms": 75.7,
+    "time_to_full_visible_answer_ms": 190.1,
+    "server_retrieval_ms": 18,
+    "server_time_to_first_token_ms": 64,
+    "server_total_ms": 192
+  },
+  {
+    "time_to_first_visible_char_ms": 67.7,
+    "time_to_full_visible_answer_ms": 197.5,
+    "server_retrieval_ms": 18,
+    "server_time_to_first_token_ms": 64,
+    "server_total_ms": 192
+  }
+]

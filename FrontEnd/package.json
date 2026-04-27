@@ -8,7 +8,11 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "benchmark:latency": "playwright test tests/qa-latency.spec.ts",
+    "benchmark:file": "node scripts/run-question-benchmark.mjs",
+    "benchmark:rawdata": "node scripts/convert-latency-json-to-raw-data.mjs"
   },
   "dependencies": {
     "react": "^19.1.0",
@@ -21,6 +25,7 @@
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
     "@types/node": "^24.0.0",
+    "@playwright/test": "^1.54.2",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
     "@vitejs/plugin-react": "^5.0.0",

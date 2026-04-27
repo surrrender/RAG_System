@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from collections.abc import Iterator
 
 from llm.config import Settings, load_settings
@@ -54,6 +55,7 @@ class QAService:
     def stream_answer_question(
         self, question: str, top_k: int, history: list[ConversationTurn] | None = None
     ) -> Iterator[dict[str, object]]:
+        start_time = time.perf_counter()
         normalized_question, chunks, prompt = self._prepare_answer(
             question=question,
             top_k=top_k,
@@ -66,26 +68,52 @@ class QAService:
                 "question": normalized_question,
                 "model": self._generator.model,
                 "retrieval_count": retrieval_count,
+                "server_started_at_ms": 0.0,
+                "retrieval_finished_at_ms": _elapsed_ms(start_time),
             },
         }
 
         if not chunks:
-            yield {"event": "delta", "data": {"text": EMPTY_RESULT_ANSWER}}
+            yield {
+                "event": "delta",
+                "data": {
+                    "text": EMPTY_RESULT_ANSWER,
+                    "server_first_token_at_ms": _elapsed_ms(start_time),
+                },
+            }
             yield {"event": "citations", "data": {"citations": []}}
-            yield {"event": "done", "data": {"answer": EMPTY_RESULT_ANSWER}}
+            yield {
+                "event": "done",
+                "data": {
+                    "answer": EMPTY_RESULT_ANSWER,
+                    "server_completed_at_ms": _elapsed_ms(start_time),
+                },
+            }
             return
 
         full_answer = ""
+        first_token_reported = False
         for chunk in self._generator.generate_stream(prompt):
             full_answer += chunk
-            yield {"event": "delta", "data": {"text": chunk}}
+            data: dict[str, object] = {"text": chunk}
+            if not first_token_reported:
+                data["server_first_token_at_ms"] = _elapsed_ms(start_time)
+                first_token_reported = True
+            yield {"event": "delta", "data": data}
 
         yield {
             "event": "citations",
             "data": {"citations": [citation.to_dict() for citation in chunks]},
         }
-        yield {"event": "done", "data": {"answer": full_answer}}
+        yield {
+            "event": "done",
+            "data": {
+                "answer": full_answer,
+                "server_completed_at_ms": _elapsed_ms(start_time),
+            },
+        }
 
+    # 检索问题相关的知识库内容,构建 prompt,返回给生成器使用
     def _prepare_answer(
         self, question: str, top_k: int, history: list[ConversationTurn] | None = None
     ) -> tuple[str, list[RetrievedChunk], str]:
@@ -110,6 +138,8 @@ def build_service(settings: Settings | None = None) -> QAService:
     current = settings or load_settings()
     retriever = Retriever(
         qdrant_path=current.qdrant_path,
+        qdrant_url=current.qdrant_url,
+        qdrant_api_key=current.qdrant_api_key,
         collection_name=current.collection_name,
         embedder_provider=current.embedder_provider,
         embedding_model=current.embedding_model,
@@ -134,3 +164,7 @@ def answer_question(question: str, top_k: int | None = None, settings: Settings 
     current = settings or load_settings()
     service = build_service(current)
     return service.answer_question(question=question, top_k=top_k or current.top_k)
+
+
+def _elapsed_ms(start_time: float) -> float:
+    return round((time.perf_counter() - start_time) * 1000, 3)

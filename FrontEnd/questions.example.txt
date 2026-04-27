@@ -1,0 +1,4 @@
+# 每行一个问题
+小程序 App 生命周期是什么？
+Page 的 onLoad 和 onShow 有什么区别？
+setData 使用时有哪些注意事项？
