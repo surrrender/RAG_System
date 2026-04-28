@@ -88,7 +88,17 @@ def _tokenize(text: str) -> Iterable[str]:
 
 
 def chunk_to_embedding_text(chunk: ChunkRecord) -> str:
-    return chunk.chunk_text.strip()
+    parts = [
+        chunk.title.strip(),
+        _format_chunk_path(chunk.nav_path, chunk.section_path),
+        chunk.chunk_text.strip(),
+    ]
+    return "\n".join(part for part in parts if part).strip()
+
+
+def _format_chunk_path(nav_path: list[str], section_path: list[str]) -> str:
+    full_path = [item.strip() for item in [*nav_path, *section_path] if str(item).strip()]
+    return " > ".join(full_path)
 
 def build_embedder(
     provider: str,

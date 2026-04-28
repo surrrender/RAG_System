@@ -78,18 +78,12 @@ def build_chunks_with_codes_and_text_together(page: PageRecord, heading_blocks: 
         chunks.append(fallback_text_chunk)
         chunks.extend(fallback_code_chunks)
     return chunks
-def _build_context_path(page: PageRecord, section_path: list[str]) -> str:
-    full_path = [item.strip() for item in [*page.nav_path, *section_path] if str(item).strip()]
-    return " > ".join(full_path)
+
 
 def _build_text_chunk(page: PageRecord, section_path: list[str], text: str) -> ChunkRecord | None:
     body = text.strip()
     if not body:
         return None
-    # 将文本路径也加入进去
-    context_path = _build_context_path(page, section_path)
-    chunke_text = f"文档路径: {context_path}\n\n{body}"
-    # 将文件的 nav_path 和 section_path 合并作为"文档路径"传给 chunk_text
     return ChunkRecord(
         chunk_id=make_chunk_id(page.doc_id, section_path, body, chunk_type="text"),
         doc_id=page.doc_id,
@@ -98,7 +92,7 @@ def _build_text_chunk(page: PageRecord, section_path: list[str], text: str) -> C
         nav_path=page.nav_path,
         section_path=section_path,
         chunk_type="text",
-        chunk_text=chunke_text,
+        chunk_text=body,
         related_code_ids=[],
         related_text_ids=[],
         token_estimate=estimate_tokens(body),
@@ -119,9 +113,6 @@ def _build_code_chunks(
 
         if not body:
             continue
-        # 将文本路径也加入进去
-        context_path = _build_context_path(page, section_path)
-        chunk_text = f"文档路径: {context_path}\n\n{body}"
         code_chunks.append(
             ChunkRecord(
                 chunk_id=make_chunk_id(
@@ -137,7 +128,7 @@ def _build_code_chunks(
                 nav_path=page.nav_path,
                 section_path=section_path,
                 chunk_type="code",
-                chunk_text=chunk_text,
+                chunk_text=body,
                 related_code_ids=[],
                 related_text_ids=related_text_ids.copy(),
                 token_estimate=estimate_tokens(body),

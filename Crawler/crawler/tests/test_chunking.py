@@ -24,10 +24,12 @@ def test_build_chunks_merges_short_sections() -> None:
     code_chunk = chunks[1]
     assert text_chunk.chunk_type == "text"
     assert "短内容" in text_chunk.chunk_text
+    assert "文档路径:" not in text_chunk.chunk_text
     assert text_chunk.related_code_ids == [code_chunk.chunk_id]
     assert code_chunk.chunk_type == "code"
-    assert "文档路径: 框架 > App > 注册 > 参数" in code_chunk.chunk_text
-    assert code_chunk.chunk_text.endswith("code();")
+    assert code_chunk.chunk_text == "code();"
+    assert code_chunk.nav_path == ["框架", "App"]
+    assert code_chunk.section_path == ["注册", "参数"]
     assert code_chunk.related_text_ids == [text_chunk.chunk_id]
 
 
@@ -46,11 +48,11 @@ def test_build_chunks_falls_back_to_page_text() -> None:
     chunks = build_chunks(page, [])
     assert len(chunks) == 2
     assert chunks[0].chunk_type == "text"
-    assert "文档路径: 框架 > Page" in chunks[0].chunk_text
-    assert chunks[0].chunk_text.endswith("page fallback text")
+    assert chunks[0].chunk_text == "page fallback text"
     assert chunks[1].chunk_type == "code"
-    assert "文档路径: 框架 > Page" in chunks[1].chunk_text
-    assert chunks[1].chunk_text.endswith("Page({})")
+    assert chunks[1].chunk_text == "Page({})"
+    assert chunks[0].nav_path == ["框架", "Page"]
+    assert chunks[1].nav_path == ["框架", "Page"]
     assert chunks[0].related_code_ids == [chunks[1].chunk_id]
     assert chunks[1].related_text_ids == [chunks[0].chunk_id]
 

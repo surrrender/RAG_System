@@ -1,4 +1,0 @@
-request_id,question,status,time_to_first_visible_char_ms,time_to_full_visible_answer_ms,server_retrieval_ms,server_time_to_first_token_ms,server_total_ms
-message-2,"小程序 App 生命周期是什么？",done,78.1,194.8,18,64,192
-message-4,"小程序 App 生命周期是什么？",done,66.8,189.5,18,64,192
-message-6,"小程序 App 生命周期是什么？",done,67,198,18,64,192

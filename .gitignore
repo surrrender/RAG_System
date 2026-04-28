@@ -34,3 +34,4 @@ FrontEnd/node_modules
 FrontEnd/.npm-cache
 FrontEnd/.playwright-browsers
 FrontEnd/test-results/
+FrontEnd/benchmark-results/

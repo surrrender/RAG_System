@@ -7,6 +7,7 @@ SYSTEM_PROMPT = """你是一个面向微信小程序文档的问答助手。
 请严格依据提供的检索资料回答，不要编造资料中没有的信息。
 如果资料不足以支持明确答案，请直接说明“未找到足够依据”，并简要指出还缺什么信息。
 回答要精准、丰富，优先给出结论，再给出必要说明。"""
+MAX_HISTORY_TURNS = 4
 
 
 def build_prompt(
@@ -41,14 +42,13 @@ def build_prompt(
 
 
 def _format_chunk(index: int, chunk: RetrievedChunk) -> str:
-    section_path = " > ".join(chunk.section_path or [])
+    section_path = " > ".join(item.strip() for item in (chunk.section_path or []) if item.strip())
+    content = _trim_chunk_content((chunk.text or "").strip())
     lines = [
         f"[资料 {index}]",
         f"标题：{chunk.title or '未知标题'}",
         f"章节：{section_path or '未知章节'}",
-        f"链接：{chunk.url or '未知链接'}",
-        f"相似度：{chunk.score:.4f}",
-        f"内容：{(chunk.text or '').strip()}",
+        f"内容：{content}",
     ]
     return "\n".join(lines).strip()
 
@@ -56,7 +56,7 @@ def _format_chunk(index: int, chunk: RetrievedChunk) -> str:
 def _format_history(history: list[ConversationTurn]) -> str:
     normalized = [
         turn for turn in history if turn.role in {"user", "assistant"} and turn.content.strip()
-    ][-6:]
+    ][-(MAX_HISTORY_TURNS * 2):]
     if not normalized:
         return ""
 
@@ -66,3 +66,9 @@ def _format_history(history: list[ConversationTurn]) -> str:
         lines.append(f"[{speaker}] {turn.content.strip()}")
 
     return "\n".join(lines) + "\n\n"
+
+
+def _trim_chunk_content(content: str, max_chars: int = 1200) -> str:
+    if len(content) <= max_chars:
+        return content
+    return content[: max_chars - 1].rstrip() + "…"
