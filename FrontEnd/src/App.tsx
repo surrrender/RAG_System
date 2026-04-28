@@ -9,7 +9,6 @@ import {
   streamQuestion,
 } from "./api/client";
 import ConversationSidebar from "./components/ConversationSidebar";
-import PerformancePanel from "./components/PerformancePanel";
 import ChatMessageList from "./components/ChatMessageList";
 import QuestionForm from "./components/QuestionForm";
 import StatusBanner from "./components/StatusBanner";
@@ -402,9 +401,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <div className="app-bg app-bg-top" />
-      <div className="app-bg app-bg-bottom" />
-      <main className="app-layout" style={{ paddingBottom: composerHeight }}>
+      <main className="app-layout">
         <div className="workspace-grid">
           <ConversationSidebar
             conversations={conversations}
@@ -426,11 +423,6 @@ export default function App() {
 
           <div className="chat-page">
             <div className="chat-column">
-              <PerformancePanel
-                latestSample={latestPerformanceSample}
-                aggregate={performanceAggregate}
-                benchmarkMode={benchmarkMode}
-              />
               {conversationError ? <StatusBanner kind="error" message={conversationError} /> : null}
               <ChatMessageList
                 messages={messages}
@@ -438,37 +430,30 @@ export default function App() {
                 title={activeConversation?.title ?? "新会话"}
                 userId={userIdRef.current}
               />
-              {!messages.length && !loading && !bootstrapping ? (
-                <StatusBanner
-                  kind="idle"
-                  message="建议先用默认问题快速验证链路，确认后端多会话接口与 `POST /qa/stream` 已经启动。"
-                />
-              ) : null}
-              {roundCount > 0 ? (
+              {/* {roundCount > 0 ? (
                 <p className="chat-footnote">
                   当前会话 {roundCount} 轮，模型回复会实时流式写入，并在消息内折叠展示引用来源。
                 </p>
-              ) : null}
+              ) : null} */}
+            </div>
+            <div className="composer-dock" ref={composerDockRef}>
+              <QuestionForm
+                question={question}
+                topK={topK}
+                loading={loading || bootstrapping || !activeConversationId}
+                validationError={validationError}
+                onStop={handleStop}
+                onQuestionChange={(value) => {
+                  setQuestion(value);
+                  if (value.trim()) {
+                    setValidationError(null);
+                  }
+                }}
+                onTopKChange={handleTopKChange}
+                onSubmit={handleSubmit}
+              />
             </div>
           </div>
-        </div>
-
-        <div className="composer-dock" ref={composerDockRef}>
-          <QuestionForm
-            question={question}
-            topK={topK}
-            loading={loading || bootstrapping || !activeConversationId}
-            validationError={validationError}
-            onStop={handleStop}
-            onQuestionChange={(value) => {
-              setQuestion(value);
-              if (value.trim()) {
-                setValidationError(null);
-              }
-            }}
-            onTopKChange={handleTopKChange}
-            onSubmit={handleSubmit}
-          />
         </div>
       </main>
     </div>
