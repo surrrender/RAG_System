@@ -1,72 +1,37 @@
 [
   {
-    "time_to_first_visible_char_ms": 7705.8,
-    "time_to_full_visible_answer_ms": 14138.1,
-    "server_retrieval_ms": 1493.16,
-    "server_time_to_first_token_ms": 7684.59,
-    "server_total_ms": 14104.62
+    "time_to_first_visible_char_ms": 7441,
+    "time_to_full_visible_answer_ms": 35090.1,
+    "server_retrieval_ms": 1506.33,
+    "server_time_to_first_token_ms": 7423.67,
+    "server_total_ms": 35045.08
   },
   {
-    "time_to_first_visible_char_ms": 7102.1,
-    "time_to_full_visible_answer_ms": 14781.5,
-    "server_retrieval_ms": 952.69,
-    "server_time_to_first_token_ms": 7087.39,
-    "server_total_ms": 14750.76
+    "time_to_first_visible_char_ms": 10525.4,
+    "time_to_full_visible_answer_ms": 40086.6,
+    "server_retrieval_ms": 1420.31,
+    "server_time_to_first_token_ms": 10495.45,
+    "server_total_ms": 40041.17
   },
   {
-    "time_to_first_visible_char_ms": 6906.4,
-    "time_to_full_visible_answer_ms": 12368.2,
-    "server_retrieval_ms": 1168.16,
-    "server_time_to_first_token_ms": 6884.69,
-    "server_total_ms": 12340.97
+    "time_to_first_visible_char_ms": 9328.4,
+    "time_to_full_visible_answer_ms": 46104.2,
+    "server_retrieval_ms": 1232.39,
+    "server_time_to_first_token_ms": 9300.33,
+    "server_total_ms": 46051.69
   },
   {
-    "time_to_first_visible_char_ms": 7776,
-    "time_to_full_visible_answer_ms": 18495.8,
-    "server_retrieval_ms": 1503.05,
-    "server_time_to_first_token_ms": 7758.87,
-    "server_total_ms": 18460.14
+    "time_to_first_visible_char_ms": 10629.1,
+    "time_to_full_visible_answer_ms": 50569.6,
+    "server_retrieval_ms": 1389.42,
+    "server_time_to_first_token_ms": 10583.39,
+    "server_total_ms": 50504.16
   },
   {
-    "time_to_first_visible_char_ms": 11412.7,
-    "time_to_full_visible_answer_ms": 26331,
-    "server_retrieval_ms": 1522.05,
-    "server_time_to_first_token_ms": 11389.04,
-    "server_total_ms": 26295.41
-  },
-  {
-    "time_to_first_visible_char_ms": 23309.9,
-    "time_to_full_visible_answer_ms": 28366.9,
-    "server_retrieval_ms": 1785.17,
-    "server_time_to_first_token_ms": 23256.51,
-    "server_total_ms": 28335.43
-  },
-  {
-    "time_to_first_visible_char_ms": 12834.1,
-    "time_to_full_visible_answer_ms": 26077.7,
-    "server_retrieval_ms": 2233.65,
-    "server_time_to_first_token_ms": 12799.74,
-    "server_total_ms": 26032.09
-  },
-  {
-    "time_to_first_visible_char_ms": 12608.9,
-    "time_to_full_visible_answer_ms": 26823.6,
-    "server_retrieval_ms": 1502.5,
-    "server_time_to_first_token_ms": 12580.34,
-    "server_total_ms": 26778.59
-  },
-  {
-    "time_to_first_visible_char_ms": 10221.3,
-    "time_to_full_visible_answer_ms": 15009.7,
-    "server_retrieval_ms": 1657.84,
-    "server_time_to_first_token_ms": 10184.28,
-    "server_total_ms": 14962.32
-  },
-  {
-    "time_to_first_visible_char_ms": 9019.5,
-    "time_to_full_visible_answer_ms": 23348.5,
-    "server_retrieval_ms": 760.5,
-    "server_time_to_first_token_ms": 8992.58,
-    "server_total_ms": 23314.32
+    "time_to_first_visible_char_ms": 21131.3,
+    "time_to_full_visible_answer_ms": 79250,
+    "server_retrieval_ms": 1668.86,
+    "server_time_to_first_token_ms": 21079.04,
+    "server_total_ms": 79169.64
   }
 ]

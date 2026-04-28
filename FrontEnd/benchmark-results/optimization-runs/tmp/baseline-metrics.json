@@ -1,0 +1,72 @@
+[
+  {
+    "time_to_first_visible_char_ms": 18169.6,
+    "time_to_full_visible_answer_ms": 71940,
+    "server_retrieval_ms": 2790.45,
+    "server_time_to_first_token_ms": 18056.23,
+    "server_total_ms": 71888.28
+  },
+  {
+    "time_to_first_visible_char_ms": 15009.6,
+    "time_to_full_visible_answer_ms": 103293.5,
+    "server_retrieval_ms": 2858.18,
+    "server_time_to_first_token_ms": 14980.42,
+    "server_total_ms": 103215.97
+  },
+  {
+    "time_to_first_visible_char_ms": 59072.3,
+    "time_to_full_visible_answer_ms": 114133.1,
+    "server_retrieval_ms": 2853.86,
+    "server_time_to_first_token_ms": 59000.79,
+    "server_total_ms": 114064.83
+  },
+  {
+    "time_to_first_visible_char_ms": 20951.8,
+    "time_to_full_visible_answer_ms": 96839.1,
+    "server_retrieval_ms": 9235.17,
+    "server_time_to_first_token_ms": 20863.82,
+    "server_total_ms": 96719.59
+  },
+  {
+    "time_to_first_visible_char_ms": 37389.2,
+    "time_to_full_visible_answer_ms": 148744.6,
+    "server_retrieval_ms": 5448.83,
+    "server_time_to_first_token_ms": 37308.4,
+    "server_total_ms": 148635.68
+  },
+  {
+    "time_to_first_visible_char_ms": 54383.3,
+    "time_to_full_visible_answer_ms": 160445.1,
+    "server_retrieval_ms": 3037.73,
+    "server_time_to_first_token_ms": 54293.27,
+    "server_total_ms": 160325.17
+  },
+  {
+    "time_to_first_visible_char_ms": 24491.8,
+    "time_to_full_visible_answer_ms": 103741.8,
+    "server_retrieval_ms": 2976.37,
+    "server_time_to_first_token_ms": 24395.18,
+    "server_total_ms": 103654.89
+  },
+  {
+    "time_to_first_visible_char_ms": 48833.9,
+    "time_to_full_visible_answer_ms": 104907.6,
+    "server_retrieval_ms": 5578.53,
+    "server_time_to_first_token_ms": 48716.26,
+    "server_total_ms": 104768.73
+  },
+  {
+    "time_to_first_visible_char_ms": 22538.3,
+    "time_to_full_visible_answer_ms": 92520.4,
+    "server_retrieval_ms": 3646.9,
+    "server_time_to_first_token_ms": 22424.96,
+    "server_total_ms": 92440.08
+  },
+  {
+    "time_to_first_visible_char_ms": 22612.3,
+    "time_to_full_visible_answer_ms": 102219.7,
+    "server_retrieval_ms": 1718.1,
+    "server_time_to_first_token_ms": 22487.09,
+    "server_total_ms": 102046.86
+  }
+]

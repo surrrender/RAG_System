@@ -70,6 +70,12 @@ benchmark-results/qa-latency.csv
 npm run benchmark:file -- ./questions.txt ./benchmark-results/question-latency-results.json
 ```
 
+这条命令会在完成采样后自动更新：
+
+```bash
+benchmark-results/question-latency-dashboard.html
+```
+
 默认读取规则：
 
 - `.txt`：每行一个问题，空行和 `#` 注释会被忽略
@@ -102,6 +108,12 @@ QA_BENCHMARK_APP_URL=http://127.0.0.1:4173/?benchmark=1 npm run benchmark:file -
 
 ```bash
 npm run benchmark:rawdata -- benchmark-results/question-latency-results.json
+```
+
+这条命令会默认直接更新：
+
+```bash
+benchmark-results/question-latency-dashboard.html
 ```
 
 如果你想把结果写到单独文件里，方便后续复制到页面中：

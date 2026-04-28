@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
 import { chromium } from "@playwright/test";
 
@@ -13,6 +15,7 @@ const trackedMetricKeys = [
   "server_total_ms",
 ];
 const defaultWaitTimeoutMs = Number(process.env.QA_BENCHMARK_TIMEOUT_MS ?? 1200000);
+const rawDataConverterPath = fileURLToPath(new URL("./convert-latency-json-to-raw-data.mjs", import.meta.url));
 
 
 async function main() {
@@ -82,13 +85,21 @@ async function main() {
       await submitButton.waitFor({ state: "visible" });
     }
 
-	    writeSamples(outputFilePath, samples);
-	    process.stdout.write(`Saved ${samples.length} benchmark samples to ${outputFilePath}\n`);
-	  } catch (error) {
-	    if (typeof globalThis.__benchmarkPartialSamples !== "undefined") {
-	      writeSamples(outputFilePath, globalThis.__benchmarkPartialSamples);
-	    }
-	    throw error;
+    writeSamples(outputFilePath, samples);
+    updateDashboardFromSamplesFile(outputFilePath);
+    process.stdout.write(`Saved ${samples.length} benchmark samples to ${outputFilePath}\n`);
+  } catch (error) {
+    if (typeof globalThis.__benchmarkPartialSamples !== "undefined") {
+      writeSamples(outputFilePath, globalThis.__benchmarkPartialSamples);
+      try {
+        updateDashboardFromSamplesFile(outputFilePath);
+      } catch (postProcessError) {
+        process.stderr.write(
+          `${postProcessError instanceof Error ? postProcessError.message : String(postProcessError)}\n`,
+        );
+      }
+    }
+    throw error;
   } finally {
     await browser.close();
   }
@@ -198,4 +209,19 @@ async function buildWaitTimeoutError(page, question, index, originalError) {
 function writeSamples(outputFilePath, samples) {
   fs.mkdirSync(path.dirname(outputFilePath), { recursive: true });
   fs.writeFileSync(outputFilePath, JSON.stringify(samples, null, 2), "utf8");
+}
+
+
+function updateDashboardFromSamplesFile(outputFilePath) {
+  const result = spawnSync(process.execPath, [rawDataConverterPath, outputFilePath], {
+    stdio: "inherit",
+  });
+
+  if (result.error) {
+    throw result.error;
+  }
+
+  if (result.status !== 0) {
+    throw new Error(`Failed to update latency dashboard from ${outputFilePath}.`);
+  }
 }

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { fileURLToPath } from "node:url";
 
 
 const requiredKeys = [
@@ -8,6 +9,11 @@ const requiredKeys = [
   "time_to_full_visible_answer_ms",
   "server_retrieval_ms",
 ];
+
+const defaultHtmlPath = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../benchmark-results/question-latency-dashboard.html",
+);
 
 
 function main() {
@@ -21,19 +27,30 @@ function main() {
   }
 
   const inputPath = path.resolve(process.cwd(), inputArg);
-  const outputPath = outputArg ? path.resolve(process.cwd(), outputArg) : null;
+  const outputPath = outputArg
+    ? path.resolve(process.cwd(), outputArg)
+    : defaultHtmlPath;
   const raw = fs.readFileSync(inputPath, "utf8");
   const parsed = JSON.parse(raw);
   const normalized = normalizeSamples(parsed);
-  const output = buildRawDataSnippet(normalized);
 
   if (outputPath) {
+    if (/\.html?$/i.test(outputPath)) {
+      const html = fs.readFileSync(outputPath, "utf8");
+      const updatedHtml = replaceRawDataBlock(html, normalized);
+      fs.writeFileSync(outputPath, updatedHtml, "utf8");
+      process.stdout.write(`Updated rawData block in ${outputPath}\n`);
+      return;
+    }
+
+    const output = buildRawDataSnippet(normalized);
     fs.mkdirSync(path.dirname(outputPath), { recursive: true });
     fs.writeFileSync(outputPath, output, "utf8");
     process.stdout.write(`Saved rawData snippet to ${outputPath}\n`);
     return;
   }
 
+  const output = buildRawDataSnippet(normalized);
   process.stdout.write(`${output}\n`);
 }
 
@@ -66,14 +83,91 @@ function normalizeSamples(parsed) {
 }
 
 
-function buildRawDataSnippet(samples) {
+function buildRawDataSnippet(samples, indent = "") {
   const lines = samples.map(
     (item) =>
-      `  { time_to_first_visible_char_ms: ${item.time_to_first_visible_char_ms}, time_to_full_visible_answer_ms: ${item.time_to_full_visible_answer_ms}, server_retrieval_ms: ${item.server_retrieval_ms} }`,
+      `${indent}  { time_to_first_visible_char_ms: ${item.time_to_first_visible_char_ms}, time_to_full_visible_answer_ms: ${item.time_to_full_visible_answer_ms}, server_retrieval_ms: ${item.server_retrieval_ms} }`,
   );
 
-  return ["const rawData = [", ...lines.map((line, index) => `${line}${index === lines.length - 1 ? "" : ","}`), "];"].join("\n");
+  return [`${indent}const rawData = [`, ...lines.map((line, index) => `${line}${index === lines.length - 1 ? "" : ","}`), `${indent}];`].join("\n");
 }
 
+
+function replaceRawDataBlock(html, samples) {
+  const startMarker = "const rawData = [";
+  const startIndex = html.indexOf(startMarker);
+
+  if (startIndex === -1) {
+    throw new Error("Could not find `const rawData = [` in the target HTML file.");
+  }
+
+  const arrayContentStart = startIndex + startMarker.length;
+  const arrayEndIndex = findMatchingClosingBracket(html, arrayContentStart - 1);
+
+  if (arrayEndIndex === -1) {
+    throw new Error("Could not find the matching closing `]` for rawData.");
+  }
+
+  const lineStart = html.lastIndexOf("\n", startIndex) + 1;
+  const indent = html.slice(lineStart, startIndex);
+
+  const newDataContent = buildRawDataArrayItems(samples, indent + "  ");
+
+  return (
+    html.slice(0, arrayContentStart) +
+    "\n" +
+    newDataContent +
+    "\n" +
+    indent +
+    html.slice(arrayEndIndex)
+  );
+}
+
+function findMatchingClosingBracket(text, openBracketIndex) {
+  let depth = 0;
+  let inString = null;
+  let escaped = false;
+
+  for (let i = openBracketIndex; i < text.length; i++) {
+    const char = text[i];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === inString) {
+        inString = null;
+      }
+      continue;
+    }
+
+    if (char === '"' || char === "'" || char === "`") {
+      inString = char;
+      continue;
+    }
+
+    if (char === "[") depth++;
+    if (char === "]") depth--;
+
+    if (depth === 0) {
+      return i;
+    }
+  }
+
+  return -1;
+}
+
+function buildRawDataArrayItems(samples, itemIndent) {
+  return samples
+    .map((sample) => {
+      return (
+        itemIndent +
+        JSON.stringify(sample)
+          .replace(/"([^"]+)":/g, "$1:")
+      );
+    })
+    .join(",\n");
+}
 
 main();
