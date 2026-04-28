@@ -16,22 +16,34 @@ def test_retriever_normalizes_results() -> None:
         reranker_model="BAAI/bge-reranker-base",
     )
 
-    def fake_build_default_embedder(provider: str, model_name: str, offline: bool, **_: object) -> str:
+    class FakeEmbedder:
+        dimension = 3
+
+    def fake_build_default_embedder(provider: str, model_name: str, offline: bool, **kwargs: object) -> FakeEmbedder:
         assert provider == "sentence-transformer"
         assert model_name == "BAAI/bge-m3"
         assert offline is True
-        return "EMBEDDER"
+        assert kwargs["device"] == "cpu"
+        return FakeEmbedder()
 
-    def fake_build_default_reranker(provider: str, model_name: str, offline: bool, **_: object) -> str:
+    def fake_build_default_reranker(provider: str, model_name: str, offline: bool, **kwargs: object) -> str:
         assert provider == "cross-encoder"
         assert model_name == "BAAI/bge-reranker-base"
         assert offline is True
+        assert kwargs["device"] == "cpu"
         return "RERANKER"
 
+    def fake_initialize_chunk_index(**kwargs: object) -> str:
+        assert kwargs["path"] == Path("/tmp/qdrant")
+        assert kwargs["collection_name"] == "demo"
+        assert kwargs["vector_size"] == 3
+        assert kwargs["recreate"] is False
+        return "INDEX"
+
     def fake_search_chunks(**kwargs: object) -> list[dict[str, object]]:
-        assert kwargs["embedder"] == "EMBEDDER"
+        assert isinstance(kwargs["embedder"], FakeEmbedder)
+        assert kwargs["index"] == "INDEX"
         assert kwargs["reranker"] == "RERANKER"
-        assert kwargs["qdrant_url"] is None
         assert kwargs["enable_reranker"] is True
         assert kwargs["rerank_candidate_limit"] == 10
         assert kwargs["query"] == "test"
@@ -49,7 +61,12 @@ def test_retriever_normalizes_results() -> None:
 
     with patch(
         "llm.retrieval.load_embedding_indexing_symbols",
-        return_value=(fake_build_default_embedder, fake_build_default_reranker, fake_search_chunks),
+        return_value=(
+            fake_build_default_embedder,
+            fake_build_default_reranker,
+            fake_initialize_chunk_index,
+            fake_search_chunks,
+        ),
     ):
         results = retriever.retrieve("test", top_k=2)
 
@@ -72,20 +89,34 @@ def test_retriever_can_disable_reranker() -> None:
         disable_reranker=True,
     )
 
-    def fake_build_default_embedder(**_: object) -> str:
-        return "EMBEDDER"
+    class FakeEmbedder:
+        dimension = 4
+
+    def fake_build_default_embedder(**kwargs: object) -> FakeEmbedder:
+        assert kwargs["device"] == "cpu"
+        return FakeEmbedder()
 
     def fail_build_default_reranker(**_: object) -> str:
         raise AssertionError("reranker should not be built when disabled")
 
+    def fake_initialize_chunk_index(**kwargs: object) -> str:
+        assert kwargs["vector_size"] == 4
+        return "INDEX"
+
     def fake_search_chunks(**kwargs: object) -> list[dict[str, object]]:
         assert kwargs["enable_reranker"] is False
         assert kwargs["reranker"] is None
+        assert kwargs["index"] == "INDEX"
         return []
 
     with patch(
         "llm.retrieval.load_embedding_indexing_symbols",
-        return_value=(fake_build_default_embedder, fail_build_default_reranker, fake_search_chunks),
+        return_value=(
+            fake_build_default_embedder,
+            fail_build_default_reranker,
+            fake_initialize_chunk_index,
+            fake_search_chunks,
+        ),
     ):
         results = retriever.retrieve("test", top_k=2)
 
@@ -103,24 +134,37 @@ def test_retriever_reuses_models_across_requests() -> None:
         reranker_provider="cross-encoder",
         reranker_model="BAAI/bge-reranker-base",
     )
-    calls = {"embedder": 0, "reranker": 0}
+    calls = {"embedder": 0, "reranker": 0, "index": 0}
 
-    def fake_build_default_embedder(**_: object) -> str:
+    class FakeEmbedder:
+        dimension = 8
+
+    def fake_build_default_embedder(**_: object) -> FakeEmbedder:
         calls["embedder"] += 1
-        return "EMBEDDER"
+        return FakeEmbedder()
 
     def fake_build_default_reranker(**_: object) -> str:
         calls["reranker"] += 1
         return "RERANKER"
 
-    def fake_search_chunks(**_: object) -> list[dict[str, object]]:
+    def fake_initialize_chunk_index(**_: object) -> str:
+        calls["index"] += 1
+        return "INDEX"
+
+    def fake_search_chunks(**kwargs: object) -> list[dict[str, object]]:
+        assert kwargs["index"] == "INDEX"
         return []
 
     with patch(
         "llm.retrieval.load_embedding_indexing_symbols",
-        return_value=(fake_build_default_embedder, fake_build_default_reranker, fake_search_chunks),
+        return_value=(
+            fake_build_default_embedder,
+            fake_build_default_reranker,
+            fake_initialize_chunk_index,
+            fake_search_chunks,
+        ),
     ):
         retriever.retrieve("first", top_k=2)
         retriever.retrieve("second", top_k=2)
 
-    assert calls == {"embedder": 1, "reranker": 1}
+    assert calls == {"embedder": 1, "reranker": 1, "index": 1}

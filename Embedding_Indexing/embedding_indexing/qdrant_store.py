@@ -50,6 +50,7 @@ class QdrantChunkIndex:
 
         self.collection_name = collection_name
         self._rest = rest
+        self._validated_vector_size: int | None = None
         if url:
             normalized_url = _normalize_local_service_url(url) or url
             self.client = QdrantClient(url=normalized_url, api_key=api_key)
@@ -70,6 +71,7 @@ class QdrantChunkIndex:
                 collection_name=self.collection_name,
                 vectors_config=self._rest.VectorParams(size=vector_size, distance=self._rest.Distance.COSINE),
             )
+            self._validated_vector_size = int(vector_size)
             return
 
         try:
@@ -89,6 +91,7 @@ class QdrantChunkIndex:
                 f"Use --recreate to rebuild the collection, or choose a different --qdrant-path / "
                 f"--collection-name."
             )
+        self._validated_vector_size = int(vector_size)
 
     def upsert(self, chunks: list[ChunkRecord], vectors: list[list[float]], batch_size: int = 64) -> None:
         if len(chunks) != len(vectors):
@@ -113,6 +116,11 @@ class QdrantChunkIndex:
         limit: int = 5,
         chunk_type: str | None = None,
     ) -> list[object]:
+        if self._validated_vector_size is not None and len(query_vector) != self._validated_vector_size:
+            raise RuntimeError(
+                f"Collection '{self.collection_name}' expects query vectors of size "
+                f"{self._validated_vector_size}, but received {len(query_vector)}."
+            )
         query_filter = None
         if chunk_type is not None:
             query_filter = self._rest.Filter(

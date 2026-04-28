@@ -25,8 +25,13 @@ def test_search_cli_enables_reranker_by_default(monkeypatch) -> None:
         calls["search"] = kwargs
         return [{"score": 1.0, "chunk_id": "c1"}]
 
+    def fake_initialize_chunk_index(**kwargs):
+        calls["index"] = kwargs
+        return "INDEX"
+
     monkeypatch.setattr(cli, "build_default_embedder", fake_embedder)
     monkeypatch.setattr(cli, "build_default_reranker", fake_reranker)
+    monkeypatch.setattr(cli, "initialize_chunk_index", fake_initialize_chunk_index)
     monkeypatch.setattr(cli, "search_chunks", fake_search_chunks)
 
     result = runner.invoke(
@@ -44,8 +49,11 @@ def test_search_cli_enables_reranker_by_default(monkeypatch) -> None:
         "provider": "cross-encoder",
         "model_name": "BAAI/bge-reranker-base",
         "offline": True,
+        "device": "cpu",
     }
     assert calls["embedder"]["device"] == "cpu"
+    assert calls["index"]["vector_size"] == getattr(calls["search"]["embedder"], "dimension", None) or calls["index"]["vector_size"]
+    assert calls["search"]["index"] == "INDEX"
     assert calls["search"]["enable_reranker"] is True
     assert calls["search"]["rerank_candidate_limit"] == 10
 
@@ -60,7 +68,12 @@ def test_search_cli_can_disable_reranker(monkeypatch) -> None:
         calls["search"] = kwargs
         return [{"score": 1.0, "chunk_id": "c1"}]
 
+    def fake_initialize_chunk_index(**kwargs):
+        calls["index"] = kwargs
+        return "INDEX"
+
     monkeypatch.setattr(cli, "build_default_embedder", fake_embedder)
+    monkeypatch.setattr(cli, "initialize_chunk_index", fake_initialize_chunk_index)
     monkeypatch.setattr(cli, "search_chunks", fake_search_chunks)
 
     def fail_build_reranker(**kwargs):
@@ -80,6 +93,7 @@ def test_search_cli_can_disable_reranker(monkeypatch) -> None:
     )
 
     assert result.exit_code == 0
+    assert calls["search"]["index"] == "INDEX"
     assert calls["search"]["enable_reranker"] is False
     assert calls["search"]["reranker"] is None
 

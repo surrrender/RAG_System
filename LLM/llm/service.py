@@ -146,8 +146,10 @@ def build_service(settings: Settings | None = None) -> QAService:
         collection_name=current.collection_name,
         embedder_provider=current.embedder_provider,
         embedding_model=current.embedding_model,
+        embedding_device=current.embedding_device,
         reranker_provider=current.reranker_provider,
         reranker_model=current.reranker_model,
+        reranker_device=current.reranker_device,
         rerank_candidate_limit=current.rerank_candidate_limit,
         disable_reranker=current.disable_reranker,
     )

@@ -20,6 +20,7 @@ from embedding_indexing.config import (
 from embedding_indexing.pipeline import (
     build_default_embedder,
     build_default_reranker,
+    initialize_chunk_index,
     index_chunks,
     search_chunks,
 )
@@ -85,6 +86,7 @@ def search(
     reranker_model_name: str = typer.Option(DEFAULT_RERANKER_MODEL_NAME),
     rerank_candidate_limit: int = typer.Option(DEFAULT_RERANK_CANDIDATE_LIMIT, min=1),
     reranker_offline: bool = typer.Option(True, help="Load reranker model from local cache only."),
+    reranker_device: str = typer.Option("cpu", help="Reranker device: cpu, mps, cuda, or auto."),
     disable_reranker: bool = typer.Option(False, help="Skip reranking and return dense retrieval results."),
 ) -> None:
     if not qdrant_url and not qdrant_path.exists():
@@ -102,12 +104,18 @@ def search(
             provider=reranker_provider,
             model_name=reranker_model_name,
             offline=reranker_offline,
+            device=reranker_device,
         )
-    results = search_chunks(
-        qdrant_path=qdrant_path,
-        qdrant_url=qdrant_url,
-        qdrant_api_key=qdrant_api_key,
+    index = initialize_chunk_index(
+        path=qdrant_path,
         collection_name=collection_name,
+        vector_size=embedder.dimension,
+        url=qdrant_url,
+        api_key=qdrant_api_key,
+        recreate=False,
+    )
+    results = search_chunks(
+        index=index,
         embedder=embedder,
         query=query,
         limit=limit,

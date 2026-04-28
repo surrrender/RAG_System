@@ -29,13 +29,14 @@ def index_chunks(
     batch_size: int = 32,
     recreate: bool = True,
 ) -> IndexStats:
-    index = QdrantChunkIndex(
+    index = initialize_chunk_index(
         path=qdrant_path,
         collection_name=collection_name,
         url=qdrant_url,
         api_key=qdrant_api_key,
+        vector_size=embedder.dimension,
+        recreate=recreate,
     )
-    index.ensure_collection(vector_size=embedder.dimension, recreate=recreate)
     chunk_count = 0
 
     for chunk_batch in _batched_chunks(iter_chunks(input_path), batch_size=batch_size):
@@ -52,11 +53,41 @@ def index_chunks(
     )
 
 
-def search_chunks(
+def build_chunk_index(
     qdrant_path: Path,
     qdrant_url: str | None,
     qdrant_api_key: str | None,
     collection_name: str,
+) -> QdrantChunkIndex:
+    return QdrantChunkIndex(
+        path=qdrant_path,
+        collection_name=collection_name,
+        url=qdrant_url,
+        api_key=qdrant_api_key,
+    )
+
+
+def initialize_chunk_index(
+    path: Path,
+    collection_name: str,
+    vector_size: int,
+    url: str | None = None,
+    api_key: str | None = None,
+    recreate: bool = False,
+) -> QdrantChunkIndex:
+    # setting up a Qdrant connection plus collection initialization, including vector size validation and optional collection recreation
+    index = QdrantChunkIndex(
+        path=path,
+        collection_name=collection_name,
+        url=url,
+        api_key=api_key,
+    )
+    index.ensure_collection(vector_size=vector_size, recreate=recreate)
+    return index
+
+
+def search_chunks(
+    index: QdrantChunkIndex,
     embedder: BaseEmbedder,
     query: str,
     limit: int = 5,
@@ -67,13 +98,6 @@ def search_chunks(
     if enable_reranker and reranker is None:
         raise ValueError("Reranker is enabled, but no reranker instance was provided.")
 
-    index = QdrantChunkIndex(
-        path=qdrant_path,
-        collection_name=collection_name,
-        url=qdrant_url,
-        api_key=qdrant_api_key,
-    )
-    index.ensure_collection(vector_size=embedder.dimension, recreate=False)
     query_vector = embedder.embed_query(query)
     candidate_limit = max(limit, rerank_candidate_limit)
     points = index.search(query_vector=query_vector, limit=candidate_limit)
@@ -105,11 +129,13 @@ def build_default_reranker(
     provider: str,
     model_name: str,
     offline: bool = False,
+    device: str = "cpu",
 ) -> BaseReranker:
     return build_reranker(
         provider=provider,
         model_name=model_name,
         offline=offline,
+        device=device,
     )
 
 

@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from embedding_indexing.embeddings import HashEmbedder
-from embedding_indexing.pipeline import index_chunks, search_chunks
+from embedding_indexing.pipeline import initialize_chunk_index, index_chunks, search_chunks
 
 
 pytest.importorskip("qdrant_client")
@@ -67,12 +67,15 @@ def test_index_and_search_round_trip() -> None:
             embedder=HashEmbedder(dimension=48),
             recreate=True,
         )
+        index = initialize_chunk_index(
+            path=qdrant_path,
+            collection_name="chunks",
+            vector_size=48,
+            recreate=False,
+        )
 
         results = search_chunks(
-            qdrant_path=qdrant_path,
-            qdrant_url=None,
-            qdrant_api_key=None,
-            collection_name="chunks",
+            index=index,
             embedder=HashEmbedder(dimension=48),
             query="app launch lifecycle",
             limit=1,
@@ -106,12 +109,15 @@ def test_search_can_disable_reranker() -> None:
             embedder=HashEmbedder(dimension=48),
             recreate=True,
         )
+        index = initialize_chunk_index(
+            path=qdrant_path,
+            collection_name="chunks",
+            vector_size=48,
+            recreate=False,
+        )
 
         results = search_chunks(
-            qdrant_path=qdrant_path,
-            qdrant_url=None,
-            qdrant_api_key=None,
-            collection_name="chunks",
+            index=index,
             embedder=HashEmbedder(dimension=48),
             query="app launch lifecycle",
             limit=2,
@@ -125,10 +131,7 @@ def test_search_can_disable_reranker() -> None:
 def test_search_raises_when_reranker_enabled_without_instance() -> None:
     with pytest.raises(ValueError, match="Reranker is enabled"):
         search_chunks(
-            qdrant_path=Path("unused"),
-            qdrant_url=None,
-            qdrant_api_key=None,
-            collection_name="chunks",
+            index=object(),
             embedder=HashEmbedder(dimension=8),
             query="app launch lifecycle",
             limit=1,
@@ -152,9 +155,11 @@ def test_index_chunks_embeds_in_batches(monkeypatch: pytest.MonkeyPatch, tmp_pat
             return [[0.0] * self.dimension for _ in texts]
 
     class FakeIndex:
-        def __init__(self, path: Path, collection_name: str) -> None:
+        def __init__(self, path: Path, collection_name: str, url: str | None = None, api_key: str | None = None) -> None:
             self.path = path
             self.collection_name = collection_name
+            self.url = url
+            self.api_key = api_key
             self.upserted: list[tuple[list[str], int]] = []
 
         def ensure_collection(self, vector_size: int, recreate: bool = False) -> None:
@@ -170,7 +175,7 @@ def test_index_chunks_embeds_in_batches(monkeypatch: pytest.MonkeyPatch, tmp_pat
     def fake_index_factory(path: Path, collection_name: str, url: str | None = None, api_key: str | None = None) -> FakeIndex:
         assert url is None
         assert api_key is None
-        index = FakeIndex(path=path, collection_name=collection_name)
+        index = FakeIndex(path=path, collection_name=collection_name, url=url, api_key=api_key)
         created_indexes.append(index)
         return index
 
