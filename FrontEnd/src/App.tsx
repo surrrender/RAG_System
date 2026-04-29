@@ -27,6 +27,7 @@ const defaultQuestion = "小程序 App 生命周期是什么？";
 const defaultTopK = 3;
 const scrollTopOffset = 28;
 const localUserIdStorageKey = "rag-system:user-id";
+const streamFlushIntervalMs = 40;
 
 
 interface ActiveRequestMetrics {
@@ -50,6 +51,16 @@ interface ActiveRequestMetrics {
   serverCompletedAt: number | null;
   terminalStatus: PerformanceSample["status"] | null;
   errorMessage: string | null;
+}
+
+interface ActiveAssistantLocation {
+  messageId: string;
+  index: number;
+}
+
+interface BufferedAssistantDelta {
+  messageId: string | null;
+  text: string;
 }
 
 
@@ -76,6 +87,10 @@ export default function App() {
   const finalPaintFrameRef = useRef<number | null>(null);
   const conversationLoadIdRef = useRef(0);
   const [composerHeight, setComposerHeight] = useState(188);
+  const messagesRef = useRef<ChatMessage[]>([]);
+  const activeAssistantLocationRef = useRef<ActiveAssistantLocation | null>(null);
+  const bufferedAssistantDeltaRef = useRef<BufferedAssistantDelta>({ messageId: null, text: "" });
+  const bufferedAssistantTimeoutRef = useRef<number | null>(null);
   const benchmarkMode = useMemo(() => {
     return new URLSearchParams(window.location.search).get("benchmark") === "1";
   }, []);
@@ -87,6 +102,10 @@ export default function App() {
   useEffect(() => {
     void bootstrapConversations();
   }, []);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   useLayoutEffect(() => {
     const targetMessageId = pendingScrollMessageIdRef.current;
@@ -110,7 +129,8 @@ export default function App() {
       return;
     }
 
-    const activeMessage = messages.find((message) => message.id === activeMetrics.requestId);
+    const activeMessageIndex = resolveTrackedMessageIndex(activeMetrics.requestId, messages);
+    const activeMessage = activeMessageIndex >= 0 ? messages[activeMessageIndex] : null;
     if (!activeMessage) {
       return;
     }
@@ -180,6 +200,7 @@ export default function App() {
         cancelAnimationFrame(finalPaintFrameRef.current);
       }
       activeRequestRef.current?.abort();
+      discardBufferedAssistantDelta();
     };
   }, []);
 
@@ -227,12 +248,19 @@ export default function App() {
     const userMessage = createOptimisticMessage(activeConversationId, "user", normalizedQuestion, "done");
     const assistantMessage = createOptimisticMessage(activeConversationId, "assistant", "", "streaming");
     const requestController = new AbortController();
+    discardBufferedAssistantDelta();
     activeRequestRef.current = requestController;
     activeRequestConversationIdRef.current = activeConversationId;
     activeMetricsRef.current = createActiveRequestMetrics(assistantMessage.id, normalizedQuestion);
 
     pendingScrollMessageIdRef.current = userMessage.id;
-    setMessages((current) => [...current, userMessage, assistantMessage]);
+    setMessages((current) => {
+      const next = [...current, userMessage, assistantMessage];
+      const assistantIndex = next.length - 1;
+      messagesRef.current = next;
+      activeAssistantLocationRef.current = { messageId: assistantMessage.id, index: assistantIndex };
+      return next;
+    });
     setConversations((current) =>
       updateConversationAfterQuestion(current, activeConversationId, normalizedQuestion),
     );
@@ -259,88 +287,75 @@ export default function App() {
           },
           onMeta: (payload) => {
             syncMetaMetrics(assistantMessage.id, payload);
-            setMessages((current) =>
-              current.map((message) =>
-                message.id === assistantMessage.id
-                  ? { ...message, model: payload.model, retrieval_count: payload.retrieval_count }
-                  : message,
-              ),
-            );
+            updateTrackedMessage(assistantMessage.id, (message) => ({
+              ...message,
+              model: payload.model,
+              retrieval_count: payload.retrieval_count,
+            }));
           },
           onDelta: ({ text, server_first_token_at_ms }) => {
+            if (!text) {
+              return;
+            }
+
+            enqueueBufferedAssistantDelta(assistantMessage.id, text);
+
             const metrics = activeMetricsRef.current;
             if (metrics && metrics.requestId === assistantMessage.id && metrics.firstDeltaAt === null) {
               metrics.firstDeltaAt = performance.now();
               metrics.serverFirstTokenAt = server_first_token_at_ms ?? metrics.serverFirstTokenAt;
               pendingFirstPaintRequestIdRef.current = assistantMessage.id;
             }
-            setMessages((current) =>
-              current.map((message) =>
-                message.id === assistantMessage.id
-                  ? { ...message, content: `${message.content}${text}`, status: "streaming" }
-                  : message,
-              ),
-            );
           },
           onCitations: ({ citations }) => {
-            setMessages((current) =>
-              current.map((message) =>
-                message.id === assistantMessage.id ? { ...message, citations } : message,
-              ),
-            );
+            flushBufferedAssistantDelta();
+            updateTrackedMessage(assistantMessage.id, (message) => ({ ...message, citations }));
           },
           onDone: (payload) => {
+            flushBufferedAssistantDelta();
             syncDoneMetrics(assistantMessage.id, payload);
             pendingFinalPaintRequestIdRef.current = assistantMessage.id;
-            setMessages((current) =>
-              current.map((message) =>
-                message.id === assistantMessage.id
-                  ? { ...message, content: payload.answer || message.content, status: "done" }
-                  : message,
-              ),
-            );
+            updateTrackedMessage(assistantMessage.id, (message) => ({
+              ...message,
+              content: payload.answer || message.content,
+              status: "done",
+            }));
             setConversations((current) => touchConversation(current, activeConversationId));
           },
           onError: (message) => {
+            flushBufferedAssistantDelta();
             markActiveRequestTerminal(assistantMessage.id, "error", message);
             pendingFinalPaintRequestIdRef.current = assistantMessage.id;
-            setMessages((current) =>
-              current.map((item) =>
-                item.id === assistantMessage.id
-                  ? { ...item, role: "error", content: message, status: "error" }
-                  : item,
-              ),
-            );
+            updateTrackedMessage(assistantMessage.id, (item) => ({
+              ...item,
+              role: "error",
+              content: message,
+              status: "error",
+            }));
           },
         },
         { signal: requestController.signal },
       );
     } catch (error) {
+      flushBufferedAssistantDelta();
       if (isAbortError(error)) {
         markActiveRequestTerminal(assistantMessage.id, "aborted", "已暂停生成。");
         pendingFinalPaintRequestIdRef.current = assistantMessage.id;
-        setMessages((current) =>
-          current.map((item) =>
-            item.id === assistantMessage.id
-              ? {
-                  ...item,
-                  content: item.content || "已暂停生成。",
-                  status: "done",
-                }
-              : item,
-          ),
-        );
+        updateTrackedMessage(assistantMessage.id, (item) => ({
+          ...item,
+          content: item.content || "已暂停生成。",
+          status: "done",
+        }));
       } else {
         const message = error instanceof Error ? error.message : "请求失败，请检查服务状态。";
         markActiveRequestTerminal(assistantMessage.id, "error", message);
         pendingFinalPaintRequestIdRef.current = assistantMessage.id;
-        setMessages((current) =>
-          current.map((item) =>
-            item.id === assistantMessage.id
-              ? { ...item, role: "error", content: message, status: "error" }
-              : item,
-          ),
-        );
+        updateTrackedMessage(assistantMessage.id, (item) => ({
+          ...item,
+          role: "error",
+          content: message,
+          status: "error",
+        }));
       }
     } finally {
       activeRequestRef.current = null;
@@ -463,6 +478,106 @@ export default function App() {
     </div>
   );
 
+  function updateTrackedMessage(
+    messageId: string,
+    update: (message: ChatMessage) => ChatMessage,
+  ): void {
+    setMessages((current) => {
+      const messageIndex = resolveTrackedMessageIndex(messageId, current);
+      if (messageIndex < 0) {
+        return current;
+      }
+
+      const currentMessage = current[messageIndex];
+      const nextMessage = update(currentMessage);
+      if (nextMessage === currentMessage) {
+        return current;
+      }
+
+      const next = current.slice();
+      next[messageIndex] = nextMessage;
+      messagesRef.current = next;
+      activeAssistantLocationRef.current = { messageId, index: messageIndex };
+      return next;
+    });
+  }
+
+  function resolveTrackedMessageIndex(messageId: string, current: ChatMessage[]): number {
+    const trackedLocation = activeAssistantLocationRef.current;
+    if (trackedLocation && trackedLocation.messageId === messageId && current[trackedLocation.index]?.id === messageId) {
+      return trackedLocation.index;
+    }
+
+    const tailIndex = current.length - 1;
+    if (tailIndex >= 0 && current[tailIndex]?.id === messageId) {
+      activeAssistantLocationRef.current = { messageId, index: tailIndex };
+      return tailIndex;
+    }
+
+    const fallbackIndex = current.findIndex((message) => message.id === messageId);
+    if (fallbackIndex >= 0) {
+      activeAssistantLocationRef.current = { messageId, index: fallbackIndex };
+    }
+    return fallbackIndex;
+  }
+
+  // 将每次生成的增量内容缓存在组件状态中，等待一定时间后批量应用到消息上，以减少 React 渲染次数提升性能。
+  function enqueueBufferedAssistantDelta(messageId: string, text: string): void {
+    const buffer = bufferedAssistantDeltaRef.current;
+    if (buffer.messageId && buffer.messageId !== messageId) {
+      flushBufferedAssistantDelta();
+    }
+
+    bufferedAssistantDeltaRef.current = {
+      messageId,
+      text: `${bufferedAssistantDeltaRef.current.text}${text}`,
+    };
+    scheduleBufferedAssistantDeltaFlush();
+  }
+
+  // 在固定 streamFlushIntervalMs 时间间隔内，批量应用增量更新到消息上，并重置缓冲区和调度器。
+  function scheduleBufferedAssistantDeltaFlush(): void {
+    if (bufferedAssistantTimeoutRef.current !== null) {
+      return;
+    }
+
+    bufferedAssistantTimeoutRef.current = window.setTimeout(() => {
+      bufferedAssistantTimeoutRef.current = null;
+      applyBufferedAssistantDelta();
+    }, streamFlushIntervalMs);
+  }
+
+  function flushBufferedAssistantDelta(): void {
+    clearBufferedAssistantDeltaSchedule();
+    applyBufferedAssistantDelta();
+  }
+
+  function discardBufferedAssistantDelta(): void {
+    clearBufferedAssistantDeltaSchedule();
+    bufferedAssistantDeltaRef.current = { messageId: null, text: "" };
+  }
+
+  function clearBufferedAssistantDeltaSchedule(): void {
+    if (bufferedAssistantTimeoutRef.current !== null) {
+      window.clearTimeout(bufferedAssistantTimeoutRef.current);
+      bufferedAssistantTimeoutRef.current = null;
+    }
+  }
+
+  function applyBufferedAssistantDelta(): void {
+    const { messageId, text } = bufferedAssistantDeltaRef.current;
+    bufferedAssistantDeltaRef.current = { messageId: null, text: "" };
+    if (!messageId || !text) {
+      return;
+    }
+
+    updateTrackedMessage(messageId, (message) => ({
+      ...message,
+      content: `${message.content}${text}`,
+      status: "streaming",
+    }));
+  }
+
   async function bootstrapConversations(): Promise<void> {
     try {
       setBootstrapping(true);
@@ -488,6 +603,9 @@ export default function App() {
     nextConversations: ConversationSummary[] = conversations,
   ): Promise<void> {
     activeRequestRef.current?.abort();
+    discardBufferedAssistantDelta();
+    activeAssistantLocationRef.current = null;
+    messagesRef.current = [];
     setActiveConversationId(conversationId);
     setMessages([]);
     setConversationError(null);
@@ -498,8 +616,10 @@ export default function App() {
     if (conversationLoadIdRef.current !== loadId) {
       return;
     }
+    const normalizedMessages = normalizeLoadedMessages(loadedMessages);
+    messagesRef.current = normalizedMessages;
     setConversations(nextConversations);
-    setMessages(normalizeLoadedMessages(loadedMessages));
+    setMessages(normalizedMessages);
   }
 
   function syncMetaMetrics(requestId: string, payload: StreamMetaEvent): void {

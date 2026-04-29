@@ -10,6 +10,7 @@ import type {
 
 
 const defaultBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() || "/api";
+const streamDeltaFlushIntervalMs = 40;
 
 
 interface StreamHandlers {
@@ -88,6 +89,26 @@ export async function streamQuestion(
   handlers: StreamHandlers,
   options: StreamOptions = {},
 ): Promise<void> {
+  const bufferedDeltaDispatcher = createBufferedDeltaDispatcher(handlers.onDelta);
+  const bufferedHandlers: StreamHandlers = {
+    ...handlers,
+    onDelta: (deltaPayload) => {
+      bufferedDeltaDispatcher.push(deltaPayload);
+    },
+    onCitations: (citationsPayload) => {
+      bufferedDeltaDispatcher.flush();
+      handlers.onCitations?.(citationsPayload);
+    },
+    onDone: (donePayload) => {
+      bufferedDeltaDispatcher.flush();
+      handlers.onDone?.(donePayload);
+    },
+    onError: (message) => {
+      bufferedDeltaDispatcher.flush();
+      handlers.onError?.(message);
+    },
+  };
+
   const response = await fetch(`${defaultBaseUrl}/qa/stream`, {
     method: "POST",
     headers: {
@@ -108,29 +129,34 @@ export async function streamQuestion(
     throw new Error("浏览器当前环境不支持流式响应。");
   }
 
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
+  try {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
 
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) {
-      break;
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) {
+        break;
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+      const frames = buffer.split("\n\n"); //把 SSE 格式的流式响应切分成一帧一帧的，SSE 规定每个事件之间是以两个换行符分隔的
+      buffer = frames.pop() || "";
+
+      // 实时处理每一条数据：更新 UI，触发回调等
+      for (const frame of frames) {
+        processSseFrame(frame, bufferedHandlers);
+      }
     }
 
-    buffer += decoder.decode(value, { stream: true });
-    const frames = buffer.split("\n\n"); //把 SSE 格式的流式响应切分成一帧一帧的，SSE 规定每个事件之间是以两个换行符分隔的
-    buffer = frames.pop() || "";
-
-    // 实时处理每一条数据：更新 UI，触发回调等
-    for (const frame of frames) {
-      processSseFrame(frame, handlers);
+    buffer += decoder.decode();
+    if (buffer.trim()) {
+      processSseFrame(buffer, bufferedHandlers);
     }
-  }
-
-  buffer += decoder.decode();
-  if (buffer.trim()) {
-    processSseFrame(buffer, handlers);
+  } finally {
+    bufferedDeltaDispatcher.flush();
+    bufferedDeltaDispatcher.dispose();
   }
 }
 
@@ -196,4 +222,69 @@ function processSseFrame(frame: string, handlers: StreamHandlers): void {
     default:
       break;
   }
+}
+
+interface BufferedDeltaDispatcher {
+  push: (payload: StreamDeltaEvent) => void;
+  flush: () => void;
+  dispose: () => void;
+}
+
+function createBufferedDeltaDispatcher(
+  onDelta?: (payload: StreamDeltaEvent) => void,
+): BufferedDeltaDispatcher {
+  let bufferedText = "";
+  let bufferedFirstTokenAt: number | undefined;
+  let timeoutId: number | null = null;
+
+  const clearSchedule = () => {
+    if (timeoutId !== null) {
+      window.clearTimeout(timeoutId);
+      timeoutId = null;
+    }
+  };
+
+  const flush = () => {
+    clearSchedule();
+    if (!bufferedText) {
+      return;
+    }
+
+    const nextPayload: StreamDeltaEvent = { text: bufferedText };
+    if (bufferedFirstTokenAt !== undefined) {
+      nextPayload.server_first_token_at_ms = bufferedFirstTokenAt;
+    }
+
+    bufferedText = "";
+    bufferedFirstTokenAt = undefined;
+    onDelta?.(nextPayload);
+  };
+
+  const schedule = () => {
+    if (timeoutId !== null) {
+      return;
+    }
+
+    timeoutId = window.setTimeout(() => {
+      flush();
+    }, streamDeltaFlushIntervalMs);
+  };
+
+  return {
+    push: (payload) => {
+      if (!payload.text) {
+        return;
+      }
+
+      bufferedText += payload.text;
+      bufferedFirstTokenAt ??= payload.server_first_token_at_ms;
+      schedule();
+    },
+    flush,
+    dispose: () => {
+      clearSchedule();
+      bufferedText = "";
+      bufferedFirstTokenAt = undefined;
+    },
+  };
 }

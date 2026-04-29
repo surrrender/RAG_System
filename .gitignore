@@ -35,3 +35,4 @@ FrontEnd/.npm-cache
 FrontEnd/.playwright-browsers
 FrontEnd/test-results/
 FrontEnd/benchmark-results/
+FrontEnd/.omm/
