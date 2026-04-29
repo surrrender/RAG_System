@@ -5,10 +5,12 @@ from typing import Any
 
 from llm.config import Settings, load_settings
 from llm.models import Citation, ConversationSummary, ConversationTurn, StoredMessage
+from llm.prompting import MAX_HISTORY_TURNS
 from llm.service import QAService, build_service
 from llm.storage import ConversationNotFoundError, ConversationStore
 
 logger = logging.getLogger(__name__)
+HISTORY_WINDOW_MESSAGES = MAX_HISTORY_TURNS * 2
 
 
 def create_app(
@@ -28,7 +30,7 @@ def create_app(
     current = settings or load_settings()
     qa_service = service or build_service(current)
     conversation_store = store or ConversationStore(current.sqlite_path)
-    
+
     @asynccontextmanager
     async def lifespan(_: Any):
         warm_up = getattr(qa_service, "warm_up", None)
@@ -176,31 +178,38 @@ def create_app(
     @app.post("/qa", response_model=QAResponse)
     def ask(payload: QARequest = Body(...)) -> QAResponse:
         try:
-            history = _load_conversation_history(
-                store=conversation_store,
+            stored_history, assistant_message = conversation_store.begin_assistant_response(
                 user_id=payload.user_id,
                 conversation_id=payload.conversation_id,
-                fallback_history=payload.history,
+                question=payload.question,
+                history_limit=HISTORY_WINDOW_MESSAGES,
             )
         except ConversationNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-        conversation_store.add_message(
+        history = _resolve_prompt_history(stored_history=stored_history, fallback_history=payload.history)
+        try:
+            result = qa_service.answer_question(
+                question=payload.question,
+                top_k=payload.top_k,
+                history=history,
+            )
+        except Exception as exc:
+            conversation_store.update_message(
+                user_id=payload.user_id,
+                conversation_id=payload.conversation_id,
+                message_id=assistant_message.id,
+                content=str(exc),
+                status="error",
+                citations=[],
+                model=None,
+                retrieval_count=None,
+            )
+            raise
+        conversation_store.update_message(
             user_id=payload.user_id,
             conversation_id=payload.conversation_id,
-            role="user",
-            content=payload.question,
-            status="done",
-        )
-        result = qa_service.answer_question(
-            question=payload.question,
-            top_k=payload.top_k,
-            history=history,
-        )
-        conversation_store.add_message(
-            user_id=payload.user_id,
-            conversation_id=payload.conversation_id,
-            role="assistant",
+            message_id=assistant_message.id,
             content=result.answer,
             status="done",
             citations=[Citation(**item.to_dict()) for item in result.citations],
@@ -212,42 +221,31 @@ def create_app(
     @app.post("/qa/stream")
     def ask_stream(payload: QARequest = Body(...)) -> StreamingResponse:
         try:
-            history = _load_conversation_history(
-                store=conversation_store,
+            stored_history, assistant_message = conversation_store.begin_assistant_response(
                 user_id=payload.user_id,
                 conversation_id=payload.conversation_id,
-                fallback_history=payload.history,
+                question=payload.question,
+                history_limit=HISTORY_WINDOW_MESSAGES,
+                assistant_status="streaming",
             )
-            conversation_store.ensure_conversation(user_id=payload.user_id, conversation_id=payload.conversation_id)
         except ConversationNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-        conversation_store.add_message(
-            user_id=payload.user_id,
-            conversation_id=payload.conversation_id,
-            role="user",
-            content=payload.question,
-            status="done",
-        )
-        assistant_message = conversation_store.add_message(
-            user_id=payload.user_id,
-            conversation_id=payload.conversation_id,
-            role="assistant",
-            content="",
-            status="streaming",
-        )
+        history = _resolve_prompt_history(stored_history=stored_history, fallback_history=payload.history)
 
         def event_stream() -> Any:
             citations: list[Citation] = []
             model: str | None = None
             retrieval_count: int | None = None
             answer_chunks: list[str] = []
+            finalized = False
             try:
                 for event in qa_service.stream_answer_question(
                     question=payload.question,
                     top_k=payload.top_k,
                     history=history,
                 ):
+                    should_stop = False
                     if event["event"] == "meta":
                         data = dict(event["data"])
                         model = str(data.get("model") or "") or None
@@ -270,6 +268,8 @@ def create_app(
                             model=model,
                             retrieval_count=retrieval_count,
                         )
+                        finalized = True
+                        should_stop = True
                     elif event["event"] == "done":
                         final_answer = str(event["data"].get("answer") or "".join(answer_chunks))
                         conversation_store.update_message(
@@ -282,18 +282,23 @@ def create_app(
                             model=model,
                             retrieval_count=retrieval_count,
                         )
+                        finalized = True
+                        should_stop = True
                     yield _encode_sse(event=event["event"], data=event["data"])
+                    if should_stop:
+                        break
             except Exception as exc:
-                conversation_store.update_message(
-                    user_id=payload.user_id,
-                    conversation_id=payload.conversation_id,
-                    message_id=assistant_message.id,
-                    content=str(exc),
-                    status="error",
-                    citations=[],
-                    model=model,
-                    retrieval_count=retrieval_count,
-                )
+                if not finalized:
+                    conversation_store.update_message(
+                        user_id=payload.user_id,
+                        conversation_id=payload.conversation_id,
+                        message_id=assistant_message.id,
+                        content=str(exc),
+                        status="error",
+                        citations=[],
+                        model=model,
+                        retrieval_count=retrieval_count,
+                    )
                 yield _encode_sse(event="error", data={"message": str(exc)})
 
         return StreamingResponse(
@@ -309,17 +314,15 @@ def _encode_sse(event: object, data: object) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
-def _load_conversation_history(
-    store: ConversationStore,
-    user_id: str,
-    conversation_id: str,
+def _resolve_prompt_history(
+    *,
+    stored_history: list[StoredMessage],
     fallback_history: list[object],
 ) -> list[ConversationTurn]:
-    stored_messages = store.get_messages(user_id=user_id, conversation_id=conversation_id)
-    if stored_messages:
+    if stored_history:
         return [
             ConversationTurn(role=item.role, content=item.content)
-            for item in stored_messages
+            for item in stored_history
             if item.role in {"user", "assistant"} and item.content.strip() and item.status != "error"
         ]
     return [ConversationTurn(role=item.role, content=item.content) for item in fallback_history]

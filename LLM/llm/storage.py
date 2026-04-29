@@ -9,6 +9,7 @@ from llm.models import Citation, ConversationSummary, StoredMessage
 
 
 DEFAULT_CONVERSATION_TITLE = "新会话"
+SQLITE_BUSY_TIMEOUT_MS = 5_000
 
 
 class ConversationNotFoundError(LookupError):
@@ -85,24 +86,81 @@ class ConversationStore:
                 (conversation_id, user_id),
             )
 
-    def get_messages(self, user_id: str, conversation_id: str) -> list[StoredMessage]:
+    def get_messages(
+        self,
+        user_id: str,
+        conversation_id: str,
+        *,
+        limit: int | None = None,
+    ) -> list[StoredMessage]:
         with self._connect() as connection:
             self._require_conversation(connection, user_id=user_id, conversation_id=conversation_id)
-            rows = connection.execute(
-                """
-                SELECT id, conversation_id, role, content, status, model, retrieval_count, citations_json, created_at
-                FROM messages
-                WHERE conversation_id = ?
-                ORDER BY created_at ASC, id ASC
-                """,
-                (conversation_id,),
-            ).fetchall()
+            rows = self._fetch_messages(connection, conversation_id=conversation_id, limit=limit)
         return [self._row_to_message(row) for row in rows]
 
     def ensure_conversation(self, user_id: str, conversation_id: str) -> ConversationSummary:
         with self._connect() as connection:
             row = self._require_conversation(connection, user_id=user_id, conversation_id=conversation_id)
         return self._row_to_conversation(row)
+
+    def begin_assistant_response(
+        self,
+        user_id: str,
+        conversation_id: str,
+        *,
+        question: str,
+        history_limit: int,
+        assistant_status: str = "pending",
+    ) -> tuple[list[StoredMessage], StoredMessage]:
+        user_message_id = str(uuid.uuid4())
+        assistant_message_id = str(uuid.uuid4())
+        created_at = _utc_now()
+        with self._connect() as connection:
+            conversation = self._require_conversation(connection, user_id=user_id, conversation_id=conversation_id)
+            history_rows = self._fetch_messages(connection, conversation_id=conversation_id, limit=history_limit)
+            self._insert_message(
+                connection,
+                message_id=user_message_id,
+                conversation_id=conversation_id,
+                role="user",
+                content=question,
+                status="done",
+                model=None,
+                retrieval_count=None,
+                citations_json=_serialize_citations([]),
+                created_at=created_at,
+            )
+            self._insert_message(
+                connection,
+                message_id=assistant_message_id,
+                conversation_id=conversation_id,
+                role="assistant",
+                content="",
+                status=assistant_status,
+                model=None,
+                retrieval_count=None,
+                citations_json=_serialize_citations([]),
+                created_at=created_at,
+            )
+            next_title = conversation["title"]
+            if conversation["title"] == DEFAULT_CONVERSATION_TITLE:
+                next_title = default_conversation_title(question)
+            self._update_conversation_activity(
+                connection,
+                conversation_id=conversation_id,
+                user_id=user_id,
+                title=next_title,
+                updated_at=created_at,
+            )
+            assistant_row = connection.execute(
+                """
+                SELECT id, conversation_id, role, content, status, model, retrieval_count, citations_json, created_at
+                FROM messages
+                WHERE id = ?
+                """,
+                (assistant_message_id,),
+            ).fetchone()
+        return [self._row_to_message(row) for row in history_rows], self._row_to_message(assistant_row)
 
     def add_message(
         self,
@@ -120,35 +178,27 @@ class ConversationStore:
         citations_json = _serialize_citations(citations or [])
         with self._connect() as connection:
             conversation = self._require_conversation(connection, user_id=user_id, conversation_id=conversation_id)
-            connection.execute(
-                """
-                INSERT INTO messages (
-                    id, conversation_id, role, content, status, model, retrieval_count, citations_json, created_at
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    message_id,
-                    conversation_id,
-                    role,
-                    content,
-                    status,
-                    model,
-                    retrieval_count,
-                    citations_json,
-                    created_at,
-                ),
+            self._insert_message(
+                connection,
+                message_id=message_id,
+                conversation_id=conversation_id,
+                role=role,
+                content=content,
+                status=status,
+                model=model,
+                retrieval_count=retrieval_count,
+                citations_json=citations_json,
+                created_at=created_at,
             )
             next_title = conversation["title"]
             if role == "user" and conversation["title"] == DEFAULT_CONVERSATION_TITLE:
                 next_title = default_conversation_title(content)
-            connection.execute(
-                """
-                UPDATE conversations
-                SET title = ?, updated_at = ?, last_message_at = ?
-                WHERE id = ? AND user_id = ?
-                """,
-                (next_title, created_at, created_at, conversation_id, user_id),
+            self._update_conversation_activity(
+                connection,
+                conversation_id=conversation_id,
+                user_id=user_id,
+                title=next_title,
+                updated_at=created_at,
             )
             row = connection.execute(
                 """
@@ -251,10 +301,126 @@ class ConversationStore:
             )
 
     def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self._database_path)
+        connection = sqlite3.connect(self._database_path, timeout=SQLITE_BUSY_TIMEOUT_MS / 1000)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
+        connection.execute("PRAGMA journal_mode = WAL")
+        connection.execute("PRAGMA synchronous = NORMAL")
+        connection.execute(f"PRAGMA busy_timeout = {SQLITE_BUSY_TIMEOUT_MS}")
         return connection
+
+    def _fetch_messages(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        conversation_id: str,
+        limit: int | None = None,
+    ) -> list[sqlite3.Row]:
+        if limit is None:
+            return connection.execute(
+                """
+                SELECT
+                    id,
+                    conversation_id,
+                    role,
+                    content,
+                    status,
+                    model,
+                    retrieval_count,
+                    citations_json,
+                    created_at,
+                    rowid AS _rowid
+                FROM messages
+                WHERE conversation_id = ?
+                ORDER BY created_at ASC, _rowid ASC
+                """,
+                (conversation_id,),
+            ).fetchall()
+        return connection.execute(
+            """
+            SELECT
+                id,
+                conversation_id,
+                role,
+                content,
+                status,
+                model,
+                retrieval_count,
+                citations_json,
+                created_at
+            FROM (
+                SELECT
+                    id,
+                    conversation_id,
+                    role,
+                    content,
+                    status,
+                    model,
+                    retrieval_count,
+                    citations_json,
+                    created_at,
+                    rowid AS _rowid
+                FROM messages
+                WHERE conversation_id = ?
+                ORDER BY created_at DESC, _rowid DESC
+                LIMIT ?
+            ) recent_messages
+            ORDER BY created_at ASC, _rowid ASC
+            """,
+            (conversation_id, limit),
+        ).fetchall()
+
+    def _insert_message(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        message_id: str,
+        conversation_id: str,
+        role: str,
+        content: str,
+        status: str,
+        model: str | None,
+        retrieval_count: int | None,
+        citations_json: str,
+        created_at: str,
+    ) -> None:
+        connection.execute(
+            """
+            INSERT INTO messages (
+                id, conversation_id, role, content, status, model, retrieval_count, citations_json, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                message_id,
+                conversation_id,
+                role,
+                content,
+                status,
+                model,
+                retrieval_count,
+                citations_json,
+                created_at,
+            ),
+        )
+
+    def _update_conversation_activity(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        conversation_id: str,
+        user_id: str,
+        title: str,
+        updated_at: str,
+    ) -> None:
+        connection.execute(
+            """
+            UPDATE conversations
+            SET title = ?, updated_at = ?, last_message_at = ?
+            WHERE id = ? AND user_id = ?
+            """,
+            (title, updated_at, updated_at, conversation_id, user_id),
+        )
 
     def _require_conversation(
         self,

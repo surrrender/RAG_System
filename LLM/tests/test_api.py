@@ -7,6 +7,46 @@ from llm.models import AnswerResult, Citation
 from llm.storage import ConversationStore
 
 
+class RecordingConversationStore(ConversationStore):
+    def __init__(self, database_path: Path) -> None:
+        super().__init__(database_path)
+        self.update_calls: list[dict[str, object]] = []
+
+    def update_message(
+        self,
+        user_id: str,
+        conversation_id: str,
+        message_id: str,
+        *,
+        content: str,
+        status: str,
+        citations: list[Citation] | None = None,
+        model: str | None = None,
+        retrieval_count: int | None = None,
+    ):
+        self.update_calls.append(
+            {
+                "user_id": user_id,
+                "conversation_id": conversation_id,
+                "message_id": message_id,
+                "content": content,
+                "status": status,
+                "model": model,
+                "retrieval_count": retrieval_count,
+            }
+        )
+        return super().update_message(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            message_id=message_id,
+            content=content,
+            status=status,
+            citations=citations,
+            model=model,
+            retrieval_count=retrieval_count,
+        )
+
+
 class StubService:
     def __init__(self) -> None:
         self.calls: list[tuple[str, int, list[dict[str, str]]]] = []
@@ -174,6 +214,56 @@ def test_post_qa_persists_messages_and_uses_stored_history(tmp_path: Path) -> No
     assert stored_messages[-1]["content"] == "answer"
 
 
+def test_post_qa_only_loads_recent_history_window(tmp_path: Path) -> None:
+    client, store = _create_client(tmp_path)
+    service = client.app.state.stub_service
+    conversation = store.create_conversation(user_id="user-a")
+
+    for index in range(1, 6):
+        store.add_message(
+            user_id="user-a",
+            conversation_id=conversation.id,
+            role="user",
+            content=f"u{index}",
+            status="done",
+        )
+        store.add_message(
+            user_id="user-a",
+            conversation_id=conversation.id,
+            role="assistant",
+            content=f"a{index}",
+            status="done",
+        )
+
+    response = client.post(
+        "/qa",
+        json={
+            "user_id": "user-a",
+            "conversation_id": conversation.id,
+            "question": "App 生命周期是什么？",
+            "top_k": 4,
+        },
+    )
+
+    assert response.status_code == 200
+    assert service.calls == [
+        (
+            "App 生命周期是什么？",
+            4,
+            [
+                {"role": "user", "content": "u2"},
+                {"role": "assistant", "content": "a2"},
+                {"role": "user", "content": "u3"},
+                {"role": "assistant", "content": "a3"},
+                {"role": "user", "content": "u4"},
+                {"role": "assistant", "content": "a4"},
+                {"role": "user", "content": "u5"},
+                {"role": "assistant", "content": "a5"},
+            ],
+        )
+    ]
+
+
 def test_post_qa_stream_returns_sse_events_and_persists_final_answer(tmp_path: Path) -> None:
     client, store = _create_client(tmp_path)
     service = client.app.state.stub_service
@@ -219,3 +309,25 @@ def test_post_qa_stream_returns_sse_events_and_persists_final_answer(tmp_path: P
     assert stored_messages[-1]["status"] == "done"
     assert stored_messages[-1]["model"] == "llama3.1:8b"
     assert stored_messages[-1]["retrieval_count"] == 1
+
+
+def test_post_qa_stream_only_updates_store_once_after_stream_completion(tmp_path: Path) -> None:
+    service = StubService()
+    store = RecordingConversationStore(tmp_path / "app.sqlite3")
+    client = TestClient(create_app(service=service, store=store))
+    conversation = store.create_conversation(user_id="user-a")
+
+    response = client.post(
+        "/qa/stream",
+        json={
+            "user_id": "user-a",
+            "conversation_id": conversation.id,
+            "question": "App 生命周期是什么？",
+            "top_k": 4,
+        },
+    )
+
+    assert response.status_code == 200
+    assert len(store.update_calls) == 1
+    assert store.update_calls[0]["status"] == "done"
+    assert store.update_calls[0]["content"] == "answer"
