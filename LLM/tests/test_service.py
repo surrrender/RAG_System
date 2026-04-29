@@ -1,5 +1,5 @@
 from llm.generator import OllamaGenerator
-from llm.models import ConversationTurn, RetrievedChunk
+from llm.models import ConversationTurn, RetrievalMetrics, RetrievedChunk
 from llm.service import EMPTY_RESULT_ANSWER, QAService
 
 
@@ -15,6 +15,13 @@ class StubRetriever:
     def retrieve(self, question: str, top_k: int) -> list[RetrievedChunk]:
         self.calls.append((question, top_k))
         return self._chunks
+
+    def retrieve_with_metrics(self, question: str, top_k: int) -> tuple[list[RetrievedChunk], RetrievalMetrics]:
+        self.calls.append((question, top_k))
+        return (
+            self._chunks,
+            RetrievalMetrics(embed_ms=1.25, vector_search_ms=2.5, rerank_ms=3.75),
+        )
 
 
 class StubGenerator:
@@ -103,6 +110,10 @@ def test_service_streams_events_with_history() -> None:
     assert events[0]["event"] == "meta"
     assert events[0]["data"]["server_started_at_ms"] == 0.0
     assert isinstance(events[0]["data"]["retrieval_finished_at_ms"], float)
+    assert events[0]["data"]["server_embed_ms"] == 1.25
+    assert events[0]["data"]["server_vector_search_ms"] == 2.5
+    assert events[0]["data"]["server_rerank_ms"] == 3.75
+    assert isinstance(events[0]["data"]["server_prompt_build_ms"], float)
     assert [event["event"] for event in events[1:3]] == ["delta", "delta"]
     assert isinstance(events[1]["data"]["server_first_token_at_ms"], float)
     assert "server_first_token_at_ms" not in events[2]["data"]
@@ -119,6 +130,10 @@ def test_service_streams_empty_result_without_citations() -> None:
     events = list(service.stream_answer_question("什么是 App？", top_k=5))
 
     assert [event["event"] for event in events] == ["meta", "delta", "citations", "done"]
+    assert events[0]["data"]["server_embed_ms"] == 1.25
+    assert events[0]["data"]["server_vector_search_ms"] == 2.5
+    assert events[0]["data"]["server_rerank_ms"] == 3.75
+    assert "server_prompt_build_ms" not in events[0]["data"]
     assert events[1]["data"]["text"] == EMPTY_RESULT_ANSWER
     assert isinstance(events[1]["data"]["server_first_token_at_ms"], float)
     assert isinstance(events[-1]["data"]["server_completed_at_ms"], float)

@@ -13,6 +13,10 @@ const trackedMetricKeys = [
   "server_retrieval_ms",
   "server_time_to_first_token_ms",
   "server_total_ms",
+  "server_embed_ms",
+  "server_vector_search_ms",
+  "server_rerank_ms",
+  "server_prompt_build_ms",
 ];
 const defaultWaitTimeoutMs = Number(process.env.QA_BENCHMARK_TIMEOUT_MS ?? 1200000);
 const rawDataConverterPath = fileURLToPath(new URL("./convert-latency-json-to-raw-data.mjs", import.meta.url));
@@ -87,12 +91,14 @@ async function main() {
 
     writeSamples(outputFilePath, samples);
     updateDashboardFromSamplesFile(outputFilePath);
+    removeLegacyStageBreakdownChart(outputFilePath);
     process.stdout.write(`Saved ${samples.length} benchmark samples to ${outputFilePath}\n`);
   } catch (error) {
     if (typeof globalThis.__benchmarkPartialSamples !== "undefined") {
       writeSamples(outputFilePath, globalThis.__benchmarkPartialSamples);
       try {
         updateDashboardFromSamplesFile(outputFilePath);
+        removeLegacyStageBreakdownChart(outputFilePath);
       } catch (postProcessError) {
         process.stderr.write(
           `${postProcessError instanceof Error ? postProcessError.message : String(postProcessError)}\n`,
@@ -224,4 +230,18 @@ function updateDashboardFromSamplesFile(outputFilePath) {
   if (result.status !== 0) {
     throw new Error(`Failed to update latency dashboard from ${outputFilePath}.`);
   }
+}
+
+
+function removeLegacyStageBreakdownChart(outputFilePath) {
+  const legacyPath = resolveStageChartOutputPath(outputFilePath);
+  if (fs.existsSync(legacyPath)) {
+    fs.unlinkSync(legacyPath);
+  }
+}
+
+
+function resolveStageChartOutputPath(outputFilePath) {
+  const { dir, name } = path.parse(outputFilePath);
+  return path.join(dir, `${name}-stage-breakdown.svg`);
 }

@@ -64,6 +64,10 @@ export interface StreamMetaEvent {
   retrieval_count: number;
   server_started_at_ms?: number;
   retrieval_finished_at_ms?: number;
+  server_embed_ms?: number;
+  server_vector_search_ms?: number;
+  server_rerank_ms?: number;
+  server_prompt_build_ms?: number;
 }
 
 
@@ -98,6 +102,10 @@ export interface PerformanceSample {
   final_paint_at_ms: number | null;
   server_started_at_ms: number | null;
   retrieval_finished_at_ms: number | null;
+  server_embed_ms: number | null;
+  server_vector_search_ms: number | null;
+  server_rerank_ms: number | null;
+  server_prompt_build_ms: number | null;
   server_first_token_at_ms: number | null;
   server_completed_at_ms: number | null;
   time_to_first_delta_ms: number | null;

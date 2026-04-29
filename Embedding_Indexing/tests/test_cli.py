@@ -13,9 +13,12 @@ runner = CliRunner()
 def test_search_cli_enables_reranker_by_default(monkeypatch) -> None:
     calls: dict[str, object] = {}
 
+    class FakeEmbedder:
+        dimension = 16
+
     def fake_embedder(**kwargs):
         calls["embedder"] = kwargs
-        return object()
+        return FakeEmbedder()
 
     def fake_reranker(**kwargs):
         calls["reranker"] = kwargs
@@ -52,7 +55,7 @@ def test_search_cli_enables_reranker_by_default(monkeypatch) -> None:
         "device": "cpu",
     }
     assert calls["embedder"]["device"] == "cpu"
-    assert calls["index"]["vector_size"] == getattr(calls["search"]["embedder"], "dimension", None) or calls["index"]["vector_size"]
+    assert calls["index"]["vector_size"] == 16
     assert calls["search"]["index"] == "INDEX"
     assert calls["search"]["enable_reranker"] is True
     assert calls["search"]["rerank_candidate_limit"] == 10
@@ -61,8 +64,11 @@ def test_search_cli_enables_reranker_by_default(monkeypatch) -> None:
 def test_search_cli_can_disable_reranker(monkeypatch) -> None:
     calls: dict[str, object] = {}
 
+    class FakeEmbedder:
+        dimension = 12
+
     def fake_embedder(**kwargs):
-        return object()
+        return FakeEmbedder()
 
     def fake_search_chunks(**kwargs):
         calls["search"] = kwargs
@@ -93,6 +99,7 @@ def test_search_cli_can_disable_reranker(monkeypatch) -> None:
     )
 
     assert result.exit_code == 0
+    assert calls["index"]["vector_size"] == 12
     assert calls["search"]["index"] == "INDEX"
     assert calls["search"]["enable_reranker"] is False
     assert calls["search"]["reranker"] is None

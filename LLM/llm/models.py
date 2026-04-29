@@ -57,6 +57,13 @@ class AnswerResult:
 
 
 @dataclass(slots=True)
+class RetrievalMetrics:
+    embed_ms: float | None = None
+    vector_search_ms: float | None = None
+    rerank_ms: float | None = None
+
+
+@dataclass(slots=True)
 class ConversationSummary:
     id: str
     user_id: str

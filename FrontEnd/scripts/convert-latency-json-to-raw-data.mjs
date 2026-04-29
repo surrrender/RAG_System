@@ -9,6 +9,12 @@ const requiredKeys = [
   "time_to_full_visible_answer_ms",
   "server_retrieval_ms",
 ];
+const optionalStageKeys = [
+  "server_embed_ms",
+  "server_vector_search_ms",
+  "server_rerank_ms",
+  "server_prompt_build_ms",
+];
 
 const defaultHtmlPath = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -78,6 +84,10 @@ function normalizeSamples(parsed) {
       time_to_first_visible_char_ms: item.time_to_first_visible_char_ms,
       time_to_full_visible_answer_ms: item.time_to_full_visible_answer_ms,
       server_retrieval_ms: item.server_retrieval_ms,
+      server_embed_ms: toOptionalNumber(item.server_embed_ms),
+      server_vector_search_ms: toOptionalNumber(item.server_vector_search_ms),
+      server_rerank_ms: toOptionalNumber(item.server_rerank_ms),
+      server_prompt_build_ms: toOptionalNumber(item.server_prompt_build_ms),
     };
   });
 }
@@ -85,8 +95,7 @@ function normalizeSamples(parsed) {
 
 function buildRawDataSnippet(samples, indent = "") {
   const lines = samples.map(
-    (item) =>
-      `${indent}  { time_to_first_visible_char_ms: ${item.time_to_first_visible_char_ms}, time_to_full_visible_answer_ms: ${item.time_to_full_visible_answer_ms}, server_retrieval_ms: ${item.server_retrieval_ms} }`,
+    (item) => `${indent}  ${formatRawDataItem(item)}`,
   );
 
   return [`${indent}const rawData = [`, ...lines.map((line, index) => `${line}${index === lines.length - 1 ? "" : ","}`), `${indent}];`].join("\n");
@@ -161,13 +170,25 @@ function findMatchingClosingBracket(text, openBracketIndex) {
 function buildRawDataArrayItems(samples, itemIndent) {
   return samples
     .map((sample) => {
-      return (
-        itemIndent +
-        JSON.stringify(sample)
-          .replace(/"([^"]+)":/g, "$1:")
-      );
+      return itemIndent + formatRawDataItem(sample);
     })
     .join(",\n");
+}
+
+
+function formatRawDataItem(sample) {
+  return JSON.stringify(sample).replace(/"([^"]+)":/g, "$1:");
+}
+
+
+function toOptionalNumber(value) {
+  if (value === null || typeof value === "undefined") {
+    return null;
+  }
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    return null;
+  }
+  return value;
 }
 
 main();

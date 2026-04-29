@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -94,18 +95,29 @@ def search_chunks(
     reranker: BaseReranker | None = None,
     enable_reranker: bool = True,
     rerank_candidate_limit: int = 10,
+    stage_metrics: dict[str, float] | None = None,
 ) -> list[dict[str, object]]:
     if enable_reranker and reranker is None:
         raise ValueError("Reranker is enabled, but no reranker instance was provided.")
 
+    embed_started_at = time.perf_counter()
     query_vector = embedder.embed_query(query)
-    candidate_limit = max(limit, rerank_candidate_limit)
-    points = index.search(query_vector=query_vector, limit=candidate_limit)
+    if stage_metrics is not None:
+        stage_metrics["embed_ms"] = _elapsed_ms(embed_started_at)
 
-    if not enable_reranker:
+    candidate_limit = max(limit, rerank_candidate_limit)
+    vector_search_started_at = time.perf_counter()
+    points = index.search(query_vector=query_vector, limit=candidate_limit)
+    if stage_metrics is not None:
+        stage_metrics["vector_search_ms"] = _elapsed_ms(vector_search_started_at)
+
+    if not enable_reranker or len(points) <= limit:
         return [_point_to_result(point) for point in points[:limit]]
 
+    rerank_started_at = time.perf_counter()
     ranked_points = _rerank_points(query=query, points=points, reranker=reranker)
+    if stage_metrics is not None:
+        stage_metrics["rerank_ms"] = _elapsed_ms(rerank_started_at)
     return [_point_to_result(point, score=score) for point, score in ranked_points[:limit]]
 
 
@@ -166,6 +178,10 @@ def _point_to_result(point: object, score: float | None = None) -> dict[str, obj
         "chunk_type": point.payload.get("chunk_type"),
         "chunk_text": point.payload.get("text"),
     }
+
+
+def _elapsed_ms(start_time: float) -> float:
+    return round((time.perf_counter() - start_time) * 1000, 3)
 
 
 # TODO:这里实现了一个批处理生成器,作用是将所有的 chunk 分配进行处理而非一次性导入

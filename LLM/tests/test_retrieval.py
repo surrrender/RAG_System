@@ -45,9 +45,13 @@ def test_retriever_normalizes_results() -> None:
         assert kwargs["index"] == "INDEX"
         assert kwargs["reranker"] == "RERANKER"
         assert kwargs["enable_reranker"] is True
-        assert kwargs["rerank_candidate_limit"] == 10
+        assert kwargs["rerank_candidate_limit"] == 5
+        assert isinstance(kwargs["stage_metrics"], dict)
         assert kwargs["query"] == "test"
         assert kwargs["limit"] == 2
+        kwargs["stage_metrics"]["embed_ms"] = 1.5
+        kwargs["stage_metrics"]["vector_search_ms"] = 2.5
+        kwargs["stage_metrics"]["rerank_ms"] = 3.5
         return [
             {
                 "chunk_id": "chunk-1",
@@ -68,12 +72,15 @@ def test_retriever_normalizes_results() -> None:
             fake_search_chunks,
         ),
     ):
-        results = retriever.retrieve("test", top_k=2)
+        results, metrics = retriever.retrieve_with_metrics("test", top_k=2)
 
     assert len(results) == 1
     assert results[0].chunk_id == "chunk-1"
     assert results[0].section_path == ["A", "B"]
     assert results[0].text == "content"
+    assert metrics.embed_ms == 1.5
+    assert metrics.vector_search_ms == 2.5
+    assert metrics.rerank_ms == 3.5
 
 
 def test_retriever_can_disable_reranker() -> None:
@@ -107,6 +114,8 @@ def test_retriever_can_disable_reranker() -> None:
         assert kwargs["enable_reranker"] is False
         assert kwargs["reranker"] is None
         assert kwargs["index"] == "INDEX"
+        kwargs["stage_metrics"]["embed_ms"] = 1.0
+        kwargs["stage_metrics"]["vector_search_ms"] = 2.0
         return []
 
     with patch(
@@ -118,9 +127,12 @@ def test_retriever_can_disable_reranker() -> None:
             fake_search_chunks,
         ),
     ):
-        results = retriever.retrieve("test", top_k=2)
+        results, metrics = retriever.retrieve_with_metrics("test", top_k=2)
 
     assert results == []
+    assert metrics.embed_ms == 1.0
+    assert metrics.vector_search_ms == 2.0
+    assert metrics.rerank_ms is None
 
 
 def test_retriever_reuses_models_across_requests() -> None:

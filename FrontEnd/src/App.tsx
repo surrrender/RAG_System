@@ -42,6 +42,10 @@ interface ActiveRequestMetrics {
   finalPaintAt: number | null;
   serverStartedAt: number | null;
   retrievalFinishedAt: number | null;
+  serverEmbedMs: number | null;
+  serverVectorSearchMs: number | null;
+  serverRerankMs: number | null;
+  serverPromptBuildMs: number | null;
   serverFirstTokenAt: number | null;
   serverCompletedAt: number | null;
   terminalStatus: PerformanceSample["status"] | null;
@@ -505,6 +509,10 @@ export default function App() {
     }
     metrics.serverStartedAt = payload.server_started_at_ms ?? metrics.serverStartedAt;
     metrics.retrievalFinishedAt = payload.retrieval_finished_at_ms ?? metrics.retrievalFinishedAt;
+    metrics.serverEmbedMs = payload.server_embed_ms ?? metrics.serverEmbedMs;
+    metrics.serverVectorSearchMs = payload.server_vector_search_ms ?? metrics.serverVectorSearchMs;
+    metrics.serverRerankMs = payload.server_rerank_ms ?? metrics.serverRerankMs;
+    metrics.serverPromptBuildMs = payload.server_prompt_build_ms ?? metrics.serverPromptBuildMs;
   }
 
   function syncDoneMetrics(requestId: string, payload: StreamDoneEvent): void {
@@ -563,6 +571,10 @@ function createActiveRequestMetrics(requestId: string, normalizedQuestion: strin
     finalPaintAt: null,
     serverStartedAt: null,
     retrievalFinishedAt: null,
+    serverEmbedMs: null,
+    serverVectorSearchMs: null,
+    serverRerankMs: null,
+    serverPromptBuildMs: null,
     serverFirstTokenAt: null,
     serverCompletedAt: null,
     terminalStatus: null,
@@ -592,6 +604,10 @@ function buildPerformanceSample(metrics: ActiveRequestMetrics): PerformanceSampl
     final_paint_at_ms: metrics.finalPaintAt !== null ? roundMs(metrics.finalPaintAt) : null,
     server_started_at_ms: metrics.serverStartedAt,
     retrieval_finished_at_ms: metrics.retrievalFinishedAt,
+    server_embed_ms: metrics.serverEmbedMs,
+    server_vector_search_ms: metrics.serverVectorSearchMs,
+    server_rerank_ms: metrics.serverRerankMs,
+    server_prompt_build_ms: metrics.serverPromptBuildMs,
     server_first_token_at_ms: metrics.serverFirstTokenAt,
     server_completed_at_ms: metrics.serverCompletedAt,
     time_to_first_delta_ms: computeDelta(metrics.submitStartAt, metrics.firstDeltaAt),

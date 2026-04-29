@@ -51,11 +51,15 @@ class StubService:
                 "data": {
                     "question": question,
                     "model": "llama3.1:8b",
-                    "retrieval_count": 1,
-                    "server_started_at_ms": 0.0,
-                    "retrieval_finished_at_ms": 12.5,
-                },
+                "retrieval_count": 1,
+                "server_started_at_ms": 0.0,
+                "retrieval_finished_at_ms": 12.5,
+                "server_embed_ms": 1.5,
+                "server_vector_search_ms": 2.5,
+                "server_rerank_ms": 3.5,
+                "server_prompt_build_ms": 4.5,
             },
+        },
             {"event": "delta", "data": {"text": "ans", "server_first_token_at_ms": 34.0}},
             {"event": "delta", "data": {"text": "wer"}},
             {
@@ -199,6 +203,10 @@ def test_post_qa_stream_returns_sse_events_and_persists_final_answer(tmp_path: P
     assert "event: delta" in response.text
     assert "event: citations" in response.text
     assert "event: done" in response.text
+    assert "server_embed_ms" in response.text
+    assert "server_vector_search_ms" in response.text
+    assert "server_rerank_ms" in response.text
+    assert "server_prompt_build_ms" in response.text
     assert service.stream_calls == [
         ("App 生命周期是什么？", 4, [{"role": "user", "content": "先介绍 App"}])
     ]

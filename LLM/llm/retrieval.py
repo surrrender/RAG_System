@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from llm._embedding_indexing import load_embedding_indexing_symbols
-from llm.models import RetrievedChunk
+from llm.models import RetrievalMetrics, RetrievedChunk
 
 
 @dataclass(slots=True)
@@ -18,9 +18,9 @@ class Retriever:
     embedding_model: str
     reranker_provider: str
     reranker_model: str
-    embedding_device: str
-    reranker_device: str
-    rerank_candidate_limit: int = 10
+    embedding_device: str = "cpu"
+    reranker_device: str = "cpu"
+    rerank_candidate_limit: int = 5
     disable_reranker: bool = False
     _embedder: object | None = None
     _reranker: object | None = None
@@ -33,10 +33,15 @@ class Retriever:
         self._get_index(embedder)
 
     def retrieve(self, question: str, top_k: int) -> list[RetrievedChunk]:
+        chunks, _ = self.retrieve_with_metrics(question, top_k)
+        return chunks
+
+    def retrieve_with_metrics(self, question: str, top_k: int) -> tuple[list[RetrievedChunk], RetrievalMetrics]:
         embedder = self._get_embedder()
         index = self._get_index(embedder)
         reranker = self._get_reranker()
         _, _, _, search_chunks = load_embedding_indexing_symbols()
+        stage_metrics: dict[str, float] = {}
         enable_reranker = reranker is not None and not self.disable_reranker
         results = search_chunks(
             index=index,
@@ -46,6 +51,7 @@ class Retriever:
             reranker=reranker,
             enable_reranker=enable_reranker,
             rerank_candidate_limit=self.rerank_candidate_limit,
+            stage_metrics=stage_metrics,
         )
         chunks = [
             RetrievedChunk(
@@ -58,7 +64,12 @@ class Retriever:
             )
             for item in results
         ]
-        return sorted(chunks, key=lambda item: item.score, reverse=True)
+        metrics = RetrievalMetrics(
+            embed_ms=stage_metrics.get("embed_ms"),
+            vector_search_ms=stage_metrics.get("vector_search_ms"),
+            rerank_ms=stage_metrics.get("rerank_ms"),
+        )
+        return sorted(chunks, key=lambda item: item.score, reverse=True), metrics
 
     def _get_embedder(self) -> object:
         if self._embedder is None:
