@@ -1,4 +1,6 @@
 from pathlib import Path
+from threading import Thread
+from time import sleep
 from unittest.mock import patch
 
 from llm.retrieval import Retriever
@@ -178,5 +180,55 @@ def test_retriever_reuses_models_across_requests() -> None:
     ):
         retriever.retrieve("first", top_k=2)
         retriever.retrieve("second", top_k=2)
+
+    assert calls == {"embedder": 1, "reranker": 1, "index": 1}
+
+
+def test_retriever_initializes_shared_dependencies_once_under_concurrency() -> None:
+    retriever = Retriever(
+        qdrant_path=Path("/tmp/qdrant"),
+        qdrant_url=None,
+        qdrant_api_key=None,
+        collection_name="demo",
+        embedder_provider="sentence-transformer",
+        embedding_model="BAAI/bge-m3",
+        reranker_provider="cross-encoder",
+        reranker_model="BAAI/bge-reranker-base",
+    )
+    calls = {"embedder": 0, "reranker": 0, "index": 0}
+
+    class FakeEmbedder:
+        dimension = 16
+
+    def fake_build_default_embedder(**_: object) -> FakeEmbedder:
+        sleep(0.05)
+        calls["embedder"] += 1
+        return FakeEmbedder()
+
+    def fake_build_default_reranker(**_: object) -> str:
+        calls["reranker"] += 1
+        return "RERANKER"
+
+    def fake_initialize_chunk_index(**_: object) -> str:
+        calls["index"] += 1
+        return "INDEX"
+
+    def fake_search_chunks(**_: object) -> list[dict[str, object]]:
+        return []
+
+    with patch(
+        "llm.retrieval.load_embedding_indexing_symbols",
+        return_value=(
+            fake_build_default_embedder,
+            fake_build_default_reranker,
+            fake_initialize_chunk_index,
+            fake_search_chunks,
+        ),
+    ):
+        threads = [Thread(target=retriever.retrieve, args=(f"question-{index}", 2)) for index in range(4)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
 
     assert calls == {"embedder": 1, "reranker": 1, "index": 1}

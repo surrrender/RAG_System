@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import warnings
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+from threading import Lock
 
 from llm._embedding_indexing import load_embedding_indexing_symbols
 from llm.models import RetrievalMetrics, RetrievedChunk
@@ -26,6 +27,9 @@ class Retriever:
     _reranker: object | None = None
     _index: object | None = None
     _reranker_unavailable: bool = False
+    _embedder_lock: Lock = field(default_factory=Lock, init=False, repr=False)
+    _reranker_lock: Lock = field(default_factory=Lock, init=False, repr=False)
+    _index_lock: Lock = field(default_factory=Lock, init=False, repr=False)
 
     def warm_up(self) -> None:
         embedder = self._get_embedder()
@@ -73,52 +77,60 @@ class Retriever:
 
     def _get_embedder(self) -> object:
         if self._embedder is None:
-            build_default_embedder, _, _, _ = load_embedding_indexing_symbols()
-            self._embedder = build_default_embedder(
-                provider=self.embedder_provider,
-                model_name=self.embedding_model,
-                offline=True,
-                device=self.embedding_device,
-            )
+            with self._embedder_lock:
+                if self._embedder is None:
+                    build_default_embedder, _, _, _ = load_embedding_indexing_symbols()
+                    self._embedder = build_default_embedder(
+                        provider=self.embedder_provider,
+                        model_name=self.embedding_model,
+                        offline=True,
+                        device=self.embedding_device,
+                    )
         return self._embedder
 
     def _get_reranker(self) -> object | None:
         if self.disable_reranker or self._reranker_unavailable:
             return None
         if self._reranker is None:
-            _, build_default_reranker, _, _ = load_embedding_indexing_symbols()
-            try:
-                self._reranker = build_default_reranker(
-                    provider=self.reranker_provider,
-                    model_name=self.reranker_model,
-                    offline=True,
-                    device=self.reranker_device,
-                )
-            except Exception as exc:
-                self._reranker_unavailable = True
-                warnings.warn(
-                    (
-                        f"Reranker '{self.reranker_model}' is unavailable; "
-                        f"falling back to dense retrieval only. Original error: {exc}"
-                    ),
-                    RuntimeWarning,
-                    stacklevel=2,
-                )
-                return None
+            with self._reranker_lock:
+                if self.disable_reranker or self._reranker_unavailable:
+                    return None
+                if self._reranker is None:
+                    _, build_default_reranker, _, _ = load_embedding_indexing_symbols()
+                    try:
+                        self._reranker = build_default_reranker(
+                            provider=self.reranker_provider,
+                            model_name=self.reranker_model,
+                            offline=True,
+                            device=self.reranker_device,
+                        )
+                    except Exception as exc:
+                        self._reranker_unavailable = True
+                        warnings.warn(
+                            (
+                                f"Reranker '{self.reranker_model}' is unavailable; "
+                                f"falling back to dense retrieval only. Original error: {exc}"
+                            ),
+                            RuntimeWarning,
+                            stacklevel=2,
+                        )
+                        return None
         return self._reranker
 
     def _get_index(self, embedder: object) -> object:
         if self._index is None:
-            _, _, initialize_chunk_index, _ = load_embedding_indexing_symbols()
-            vector_size = int(getattr(embedder, "dimension"))
-            self._index = initialize_chunk_index(
-                path=self.qdrant_path,
-                collection_name=self.collection_name,
-                vector_size=vector_size,
-                url=self.qdrant_url,
-                api_key=self.qdrant_api_key,
-                recreate=False,
-            )
+            with self._index_lock:
+                if self._index is None:
+                    _, _, initialize_chunk_index, _ = load_embedding_indexing_symbols()
+                    vector_size = int(getattr(embedder, "dimension"))
+                    self._index = initialize_chunk_index(
+                        path=self.qdrant_path,
+                        collection_name=self.collection_name,
+                        vector_size=vector_size,
+                        url=self.qdrant_url,
+                        api_key=self.qdrant_api_key,
+                        recreate=False,
+                    )
         return self._index
 
 

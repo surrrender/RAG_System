@@ -70,6 +70,15 @@ POST   /qa/stream
 LLM_SQLITE_PATH=/absolute/path/to/app.sqlite3
 ```
 
+当前 SQLite 连接会显式启用：
+
+- `journal_mode=WAL`
+- `synchronous=NORMAL`
+- `busy_timeout=5000`
+- 写事务使用 `BEGIN IMMEDIATE`
+
+这样可以降低多用户并发时的写锁冲突，并避免读后写事务在竞争下更容易出现的锁升级失败。
+
 ## Qdrant 配置
 
 默认仍然兼容本地目录模式：
@@ -84,3 +93,28 @@ LLM_QDRANT_PATH=./Embedding_Indexing/data/qdrant
 LLM_QDRANT_URL=http://127.0.0.1:6333
 LLM_QDRANT_API_KEY=optional-api-key
 ```
+
+补充说明：
+
+- `Qdrant local mode` 更适合开发和单实例测试。
+- 如果同一个本地索引目录会被多个客户端、多个进程或更高并发同时访问，建议改用 `Qdrant server mode`。
+- 现在如果检测到 local mode 目录锁冲突，错误信息会直接提示切换到 `LLM_QDRANT_URL`。
+
+## 并发压测
+
+仓库里新增了一个可直接执行的并发压测脚本：
+
+```bash
+python LLM/scripts/run_stream_concurrency_benchmark.py \
+  --base-url http://127.0.0.1:8000 \
+  --user-count 4 \
+  --conversations-per-user 2 \
+  --question "小程序 App 生命周期是什么？"
+```
+
+它会先自动创建多组 `user_id` / `conversation_id`，然后并发发起 `/qa/stream` 请求，并输出：
+
+- 失败率
+- 首字符延迟统计
+- 单请求总耗时统计
+- 服务端检索/首 token/总耗时统计

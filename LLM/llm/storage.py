@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import sqlite3
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 from llm.models import Citation, ConversationSummary, StoredMessage
@@ -10,6 +12,7 @@ from llm.models import Citation, ConversationSummary, StoredMessage
 
 DEFAULT_CONVERSATION_TITLE = "新会话"
 SQLITE_BUSY_TIMEOUT_MS = 5_000
+SQLITE_WAL_AUTOCHECKPOINT_PAGES = 1_000
 
 
 class ConversationNotFoundError(LookupError):
@@ -23,7 +26,7 @@ class ConversationStore:
         self._initialize()
 
     def list_conversations(self, user_id: str) -> list[ConversationSummary]:
-        with self._connect() as connection:
+        with self._read_connection() as connection:
             rows = connection.execute(
                 """
                 SELECT id, user_id, title, created_at, updated_at, last_message_at
@@ -39,7 +42,7 @@ class ConversationStore:
         conversation_id = str(uuid.uuid4())
         timestamp = _utc_now()
         normalized_title = _normalize_title(title) or DEFAULT_CONVERSATION_TITLE
-        with self._connect() as connection:
+        with self._write_connection() as connection:
             connection.execute(
                 """
                 INSERT INTO conversations (id, user_id, title, created_at, updated_at, last_message_at)
@@ -62,7 +65,7 @@ class ConversationStore:
         if normalized_title is None:
             raise ValueError("title must not be empty")
         updated_at = _utc_now()
-        with self._connect() as connection:
+        with self._write_connection() as connection:
             self._require_conversation(connection, user_id=user_id, conversation_id=conversation_id)
             connection.execute(
                 "UPDATE conversations SET title = ?, updated_at = ? WHERE id = ? AND user_id = ?",
@@ -79,7 +82,7 @@ class ConversationStore:
         return self._row_to_conversation(row)
 
     def delete_conversation(self, user_id: str, conversation_id: str) -> None:
-        with self._connect() as connection:
+        with self._write_connection() as connection:
             self._require_conversation(connection, user_id=user_id, conversation_id=conversation_id)
             connection.execute(
                 "DELETE FROM conversations WHERE id = ? AND user_id = ?",
@@ -93,13 +96,13 @@ class ConversationStore:
         *,
         limit: int | None = None,
     ) -> list[StoredMessage]:
-        with self._connect() as connection:
+        with self._read_connection() as connection:
             self._require_conversation(connection, user_id=user_id, conversation_id=conversation_id)
             rows = self._fetch_messages(connection, conversation_id=conversation_id, limit=limit)
         return [self._row_to_message(row) for row in rows]
 
     def ensure_conversation(self, user_id: str, conversation_id: str) -> ConversationSummary:
-        with self._connect() as connection:
+        with self._read_connection() as connection:
             row = self._require_conversation(connection, user_id=user_id, conversation_id=conversation_id)
         return self._row_to_conversation(row)
 
@@ -115,7 +118,7 @@ class ConversationStore:
         user_message_id = str(uuid.uuid4())
         assistant_message_id = str(uuid.uuid4())
         created_at = _utc_now()
-        with self._connect() as connection:
+        with self._write_connection() as connection:
             conversation = self._require_conversation(connection, user_id=user_id, conversation_id=conversation_id)
             history_rows = self._fetch_messages(connection, conversation_id=conversation_id, limit=history_limit)
             self._insert_message(
@@ -176,7 +179,7 @@ class ConversationStore:
         message_id = str(uuid.uuid4())
         created_at = _utc_now()
         citations_json = _serialize_citations(citations or [])
-        with self._connect() as connection:
+        with self._write_connection() as connection:
             conversation = self._require_conversation(connection, user_id=user_id, conversation_id=conversation_id)
             self._insert_message(
                 connection,
@@ -224,7 +227,7 @@ class ConversationStore:
     ) -> StoredMessage:
         updated_at = _utc_now()
         citations_json = _serialize_citations(citations or [])
-        with self._connect() as connection:
+        with self._write_connection() as connection:
             self._require_conversation(connection, user_id=user_id, conversation_id=conversation_id)
             row = connection.execute(
                 """
@@ -262,7 +265,7 @@ class ConversationStore:
         return self._row_to_message(updated_row)
 
     def _initialize(self) -> None:
-        with self._connect() as connection:
+        with self._write_connection() as connection:
             connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS conversations (
@@ -301,13 +304,39 @@ class ConversationStore:
             )
 
     def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self._database_path, timeout=SQLITE_BUSY_TIMEOUT_MS / 1000)
+        connection = sqlite3.connect(
+            self._database_path,
+            timeout=SQLITE_BUSY_TIMEOUT_MS / 1000,
+            isolation_level=None,
+        )
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
         connection.execute("PRAGMA journal_mode = WAL")
         connection.execute("PRAGMA synchronous = NORMAL")
         connection.execute(f"PRAGMA busy_timeout = {SQLITE_BUSY_TIMEOUT_MS}")
+        connection.execute(f"PRAGMA wal_autocheckpoint = {SQLITE_WAL_AUTOCHECKPOINT_PAGES}")
         return connection
+
+    @contextmanager
+    def _read_connection(self) -> Iterator[sqlite3.Connection]:
+        connection = self._connect()
+        try:
+            yield connection
+        finally:
+            connection.close()
+
+    @contextmanager
+    def _write_connection(self) -> Iterator[sqlite3.Connection]:
+        connection = self._connect()
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            yield connection
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
 
     def _fetch_messages(
         self,

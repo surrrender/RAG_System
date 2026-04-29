@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from llm.storage import SQLITE_BUSY_TIMEOUT_MS, ConversationStore
+from llm.storage import SQLITE_BUSY_TIMEOUT_MS, SQLITE_WAL_AUTOCHECKPOINT_PAGES, ConversationStore
 
 
 def test_get_messages_limit_returns_recent_window_in_order(tmp_path: Path) -> None:
@@ -36,11 +36,13 @@ def test_get_messages_limit_returns_recent_window_in_order(tmp_path: Path) -> No
 def test_store_enables_sqlite_write_pragmas(tmp_path: Path) -> None:
     store = ConversationStore(tmp_path / "app.sqlite3")
 
-    with store._connect() as connection:
+    with store._read_connection() as connection:
         journal_mode = str(connection.execute("PRAGMA journal_mode").fetchone()[0]).lower()
         synchronous = int(connection.execute("PRAGMA synchronous").fetchone()[0])
         busy_timeout = int(connection.execute("PRAGMA busy_timeout").fetchone()[0])
+        wal_autocheckpoint = int(connection.execute("PRAGMA wal_autocheckpoint").fetchone()[0])
 
     assert journal_mode == "wal"
     assert synchronous == 1
     assert busy_timeout == SQLITE_BUSY_TIMEOUT_MS
+    assert wal_autocheckpoint == SQLITE_WAL_AUTOCHECKPOINT_PAGES

@@ -51,11 +51,20 @@ class QdrantChunkIndex:
         self.collection_name = collection_name
         self._rest = rest
         self._validated_vector_size: int | None = None
+        self._configured_path = path
+        self._configured_url = _normalize_local_service_url(url) or url
         if url:
-            normalized_url = _normalize_local_service_url(url) or url
-            self.client = QdrantClient(url=normalized_url, api_key=api_key)
+            try:
+                self.client = QdrantClient(url=self._configured_url, api_key=api_key)
+            except Exception as exc:
+                raise RuntimeError(self._build_connection_error(exc)) from exc
         else:
-            self.client = QdrantClient(path=str(path))
+            try:
+                self.client = QdrantClient(path=str(path))
+            except Exception as exc:
+                if _is_local_mode_concurrency_error(exc):
+                    raise RuntimeError(self._build_local_mode_concurrency_error(exc)) from exc
+                raise RuntimeError(self._build_connection_error(exc)) from exc
 
     def ensure_collection(self, vector_size: int, recreate: bool = False) -> None:
         try:
@@ -144,8 +153,14 @@ class QdrantChunkIndex:
             raise RuntimeError(self._build_connection_error(exc)) from exc
 
     def _build_connection_error(self, exc: Exception) -> str:
-        url = getattr(self.client, "url", None)
-        return f"Failed to reach Qdrant: {exc}. {_protocol_hint(url, 'Qdrant')}"
+        return f"Failed to reach Qdrant: {exc}. {_protocol_hint(self._configured_url, 'Qdrant')}"
+
+    def _build_local_mode_concurrency_error(self, exc: Exception) -> str:
+        return (
+            f"Failed to open local Qdrant path '{self._configured_path}': {exc}. "
+            "Qdrant local mode does not support concurrent multi-client access; "
+            "for multi-user QA please run Qdrant server and set LLM_QDRANT_URL."
+        )
 
 
 def _normalize_local_service_url(url: str | None) -> str | None:
@@ -176,3 +191,8 @@ def _protocol_hint(url: str | None, service_name: str) -> str:
             f"the URL scheme should be http:// instead of https://."
         )
     return f"{service_name} connection failed. Check whether the configured URL is reachable."
+
+
+def _is_local_mode_concurrency_error(exc: Exception) -> bool:
+    message = str(exc).lower()
+    return "already accessed by another instance" in message or ".lock" in message
