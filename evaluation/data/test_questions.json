@@ -1,0 +1,452 @@
+{
+  "meta": {
+    "dataset_name": "wechat-miniprogram-eval-v1",
+    "created_at": "2026-05-12T21:25:26",
+    "total_documents": 1921,
+    "total_chunks": 6320,
+    "total_questions": 40,
+    "generation_model": "qwen3:8b"
+  },
+  "questions": [
+    {
+      "id": "q001",
+      "question": "在使用 wx.onNeedPrivacyAuthorization 接口监听隐私授权事件时，开发者发现事件未被触发，如何排查原因？",
+      "relevant_chunk_ids": [
+        "2887b49625d5a25f-d2ee5279de86d59bcbc4"
+      ],
+      "reference_answer": "若 wx.onNeedPrivacyAuthorization 事件未被触发，首先检查是否在基础库 2.32.3 及以上版本中使用。其次确认是否调用了需要用户授权的隐私接口，如 wx.getUserProfile。若使用 <input type=\"nickname\"> 组件，需确保用户已同意隐私协议，否则聚焦时不会触发事件。此外，检查是否在 onLoad 等生命周期函数中正确绑定事件监听，并确保 resolvePrivacyAuthorization 函数已定义。",
+      "category": "健康运营指引",
+      "difficulty": "medium",
+      "source_doc_title": "小程序隐私协议开发指南"
+    },
+    {
+      "id": "q002",
+      "question": "在微信小程序中，如果代码包内包含大量图片资源导致体积过大，应该如何优化？",
+      "relevant_chunk_ids": [
+        "bf97de6ca4943d41-205d70526767a08fde83"
+      ],
+      "reference_answer": "如果代码包内包含大量图片资源导致体积过大，建议将图片资源部署到CDN，并通过URL引入，以减少代码包体积。图片、音频、视频等资源文件通常难以进一步压缩，且对下载耗时影响较大。此外，应避免在WXSS中使用base64内联大体积图片，仅保留体积较小的图标在代码包中。这样可以有效降低代码包体积，提升用户首次加载速度。",
+      "category": "性能与体验",
+      "difficulty": "easy",
+      "source_doc_title": "代码包体积优化"
+    },
+    {
+      "id": "q003",
+      "question": "在iOS设备上使用picker-view时，用户反馈滚动时有振动反馈，如何关闭此功能？",
+      "relevant_chunk_ids": [
+        "02a16378e31deecf-6b33803bc97ad8815491"
+      ],
+      "reference_answer": "在iOS设备上，picker-view滚动时会触发系统自带的振动反馈。开发者可以通过引导用户进入系统设置 -> 声音与触感 -> 系统触感反馈中关闭该功能。此行为是iOS系统的默认设置，无法通过代码直接禁用，只能通过系统设置进行调整。",
+      "category": "表单组件",
+      "difficulty": "easy",
+      "source_doc_title": "picker-view"
+    },
+    {
+      "id": "q004",
+      "question": "在 glass-easel 组件框架中，如果在 data 中定义了一个函数，并在模板中调用它，但调用时没有正确显示返回值，可能是什么原因？",
+      "relevant_chunk_ids": [
+        "f6a21a8096c58d3c-b51ad330b8a7bbf6c6d4"
+      ],
+      "reference_answer": "在 glass-easel 组件框架中，如果在 data 中定义了一个函数并在模板中调用它，但未正确显示返回值，可能是因为函数没有正确返回值，或者函数没有被正确绑定到模板中。此外，由于 glass-easel 仅支持 Skyline 渲染引擎，某些函数调用可能受到限制。建议检查函数是否返回了正确的值，并确保函数名在模板中正确调用。若函数主要用于数据预处理，推荐使用 WXS 替代，以提高性能和可维护性。",
+      "category": "glass-easel 组件框架",
+      "difficulty": "easy",
+      "source_doc_title": "在模板中调用 data 里的函数"
+    },
+    {
+      "id": "q005",
+      "question": "在使用 wx.faceDetect 接口时，如何判断是否成功检测到人脸？",
+      "relevant_chunk_ids": [
+        "55a5eaa70b5068d9-0fcb8a64522c4c3fd87b"
+      ],
+      "reference_answer": "在 wx.faceDetect 接口的 Object object 参数中，通过 object.success 回调函数判断是否成功检测到人脸。若检测成功，success 回调函数会被调用，并返回包含 detectRect、x、y、pointArray、confArray、angleArray 等属性的对象，用于获取人脸位置、中心点、轮廓点、置信度和角度信息。若检测失败或未检测到人脸，success 回调函数不会被触发，开发者需通过 object.fail 或 object.complete 判断检测状态。",
+      "category": "AI",
+      "difficulty": "easy",
+      "source_doc_title": "wx.faceDetect(Object object)"
+    },
+    {
+      "id": "q006",
+      "question": "使用 FileSystemManager 的 access 方法判断文件是否存在时，调用后仍然无法读取文件内容，可能是什么原因？",
+      "relevant_chunk_ids": [
+        "53275efef3cf756d-c8a6323be83f0e38db23"
+      ],
+      "reference_answer": "可能原因是文件路径错误或文件已被其他进程占用。检查文件路径是否正确，确保文件确实存在于指定路径。另外，如果文件被其他进程锁定，可能导致无法读取。建议使用 FileSystemManager 的 readFileSync 或 readFile 方法进行读取，并确保文件权限允许当前小程序访问。",
+      "category": "文件",
+      "difficulty": "medium",
+      "source_doc_title": "FileSystemManager"
+    },
+    {
+      "id": "q007",
+      "question": "使用 wx.startLocationUpdateBackground 接口时，调用 success 回调函数却未触发，可能是什么原因？",
+      "relevant_chunk_ids": [
+        "ff53ec3893941908-6b26c376db7a73d10761"
+      ],
+      "reference_answer": "可能原因包括：1. 接口调用失败，未正确处理 fail 回调；2. 设备不支持后台定位功能；3. 未在小程序后台运行时持续定位；4. 未正确配置定位权限或未启用定位服务。建议检查设备兼容性、网络状态、权限配置以及接口调用逻辑是否正确。此外，需确保在用户授权后调用该接口。",
+      "category": "位置",
+      "difficulty": "medium",
+      "source_doc_title": "wx.startLocationUpdateBackground(Object object)"
+    },
+    {
+      "id": "q008",
+      "question": "在多人音视频对话功能中，如果使用已存在的 groupId 重新加入房间，为什么会被视为新开一个房间？",
+      "relevant_chunk_ids": [
+        "a845e8696b53d712-b078b3e8477d1335d856"
+      ],
+      "reference_answer": "当使用已存在的 groupId 重新加入房间时，系统会判断该房间是否已被销毁。如果房间已经被销毁（即所有人已退出），则会视为新开一个房间。因此，即使使用相同的 groupId，只要房间已被销毁，系统会重新创建房间并计数。开发者需要注意房间的生命周期管理，避免因 groupId 重复使用导致超出频率限制。",
+      "category": "开放能力",
+      "difficulty": "easy",
+      "source_doc_title": "多人音视频对话"
+    },
+    {
+      "id": "q009",
+      "question": "在使用自定义组件时，如果在页面模板中引用的组件节点名未在 json 文件中显式定义，会导致什么问题？",
+      "relevant_chunk_ids": [
+        "d21d59199f0eaf0d-6097ced36e11d699a93e"
+      ],
+      "reference_answer": "如果在页面模板中引用的自定义组件节点名未在 json 文件中显式定义，该节点将被当作无意义的节点处理，无法正确渲染组件，导致组件无法显示或报错。开发者需要在 json 文件中通过 \"usingComponents\" 字段显式声明组件节点名，以确保组件能被正确识别和加载。",
+      "category": "自定义组件",
+      "difficulty": "easy",
+      "source_doc_title": "组件模板和样式"
+    },
+    {
+      "id": "q010",
+      "question": "在使用 wx.offVoIPChatStateChanged 方法时，如果传入的函数对象与监听时的不一致，会导致什么问题？",
+      "relevant_chunk_ids": [
+        "920d6f0226283749-1e0c543356867f54d7a3"
+      ],
+      "reference_answer": "在使用 wx.offVoIPChatStateChanged 方法时，必须传入与 wx.onVoIPChatStateChanged 监听时完全相同的函数对象，否则无法正确移除监听器。如果传入的函数对象不一致，小程序不会触发移除操作，导致监听器仍然存在，可能引发内存泄漏或重复触发的问题。因此，开发者在移除监听器时，必须确保使用的是同一个函数引用。",
+      "category": "媒体",
+      "difficulty": "easy",
+      "source_doc_title": "wx.offVoIPChatStateChanged(function listener)"
+    },
+    {
+      "id": "q011",
+      "question": "使用 wx.removeStorage 删除本地缓存时，发现指定 key 的数据未被成功移除，可能是什么原因导致的？",
+      "relevant_chunk_ids": [
+        "1ac6a5de051583b0-777da8c116255df3be50"
+      ],
+      "reference_answer": "可能的原因包括：1. key 参数拼写错误或与存储时的 key 不一致；2. 未在调用 wx.removeStorage 前确保 key 已存在；3. 在某些环境下（如小程序页面关闭后），本地缓存可能被系统清理；4. 未正确处理异步操作，导致在数据未删除前就尝试读取。建议检查 key 是否正确，使用 wx.getStorage 验证 key 是否存在，并确保在调用 wx.removeStorage 后进行相应的错误处理。",
+      "category": "数据缓存",
+      "difficulty": "easy",
+      "source_doc_title": "wx.removeStorage(Object object)"
+    },
+    {
+      "id": "q012",
+      "question": "使用 wx.createWorker 创建实验 worker 时，如果 worker 被系统回收，如何确保 worker 能够自动重新创建？",
+      "relevant_chunk_ids": [
+        "ec360c99b06f1d85-253af4177d69640a79b1"
+      ],
+      "reference_answer": "当使用 wx.createWorker 创建实验 worker 并监听 onProcessKilled 事件时，可以在回调函数中重新调用 createNewWorker 函数来重新创建 worker。这样可以确保 worker 在被系统回收后自动恢复运行。需要注意的是，应确保 createNewWorker 函数在全局作用域中可访问，并且避免在 worker 回收期间出现资源竞争或重复创建的问题。",
+      "category": "Worker",
+      "difficulty": "easy",
+      "source_doc_title": "Worker wx.createWorker(string scriptPath, object options)"
+    },
+    {
+      "id": "q013",
+      "question": "使用we分析查看小程序运营数据时，无法加载数据并提示'网络错误'，应该如何解决？",
+      "relevant_chunk_ids": [
+        "8f6d683ed4ab5323-e9fc8b1ecfe693047241"
+      ],
+      "reference_answer": "当使用we分析查看小程序运营数据时提示'网络错误'，可能是由于网络连接不稳定或微信客户端缓存问题导致。建议先检查网络连接是否正常，尝试切换网络环境。若问题依旧，可尝试清除微信缓存或重新登录微信账号。此外，也可能是微信版本过旧，建议更新至最新版本以确保兼容性。",
+      "category": "起步",
+      "difficulty": "easy",
+      "source_doc_title": "小程序协同工作和发布"
+    },
+    {
+      "id": "q014",
+      "question": "使用CanvasContext.fillRect绘制矩形时，矩形没有显示在画布上，可能是什么原因导致的？",
+      "relevant_chunk_ids": [
+        "9f80498fa082239d-4bf98df0d768f90228d0"
+      ],
+      "reference_answer": "可能的原因包括：1. 画布未正确初始化或未调用draw()方法；2. fillRect的参数顺序或数值错误，导致矩形位置超出画布范围；3. fillStyle未正确设置，导致颜色未生效；4. 画布尺寸未设置或未正确渲染到页面上。建议检查是否调用了draw()方法，确认参数是否正确，并确保画布尺寸设置正确。",
+      "category": "画布",
+      "difficulty": "easy",
+      "source_doc_title": "CanvasContext.fillRect(number x, number y, number width, number height)"
+    },
+    {
+      "id": "q015",
+      "question": "在接收到事件推送参数时，如何解析并处理 `illegal_content` 字段中的违规内容？",
+      "relevant_chunk_ids": [
+        "58428d75d0089280-62ca96f58c28778c8686"
+      ],
+      "reference_answer": "在接收到 `illegal_content` 字段时，应将其视为一个字符串数组，包含违规内容的具体描述。开发者应根据该字段内容进行日志记录或内容审核，以识别违规行为的来源。同时，结合 `illegal_reason` 和 `rule_url` 等字段，可进一步判断违规类型，并根据平台规则进行调整或修复。建议在服务端进行内容过滤和合规性检查，以确保小程序符合平台规范。",
+      "category": "other",
+      "difficulty": "easy",
+      "source_doc_title": "安全指引"
+    },
+    {
+      "id": "q016",
+      "question": "在使用 wx.createAudioContext 创建 AudioContext 时，如何解决 AudioContext 的 duration 为 0 的问题？",
+      "relevant_chunk_ids": [
+        "8252c25a001121da-45fc5cede3c1bda0039e"
+      ],
+      "reference_answer": "在微信小程序中，AudioContext 的 duration 为 0 通常表示音频文件未正确加载或解析。建议检查音频文件路径是否正确，确保文件格式支持（如 mp3、wav 等），并且文件大小在小程序限制范围内。此外，确保在调用 AudioContext 的 play() 方法前，音频文件已完全加载。如果问题仍然存在，可以尝试在音频加载完成后通过 onCanPlay 事件进行处理。",
+      "category": "媒体",
+      "difficulty": "medium",
+      "source_doc_title": "AudioContext wx.createAudioContext(string id, Object this)"
+    },
+    {
+      "id": "q017",
+      "question": "使用 wx.openHKOfflinePayView 接口时，调用失败提示 '商户未开通 WeChat Pay HK 支付权限'，如何解决？",
+      "relevant_chunk_ids": [
+        "7d83f6b57601aa9d-06eb1292c97c739fc75e"
+      ],
+      "reference_answer": "提示 '商户未开通 WeChat Pay HK 支付权限' 说明商户尚未完成接入流程。需确认商户是否已按照文档要求，通过邮箱 hkpayment@wechat.com 提交申请，并附上完整的资质材料（如 CI 或 BR）、场景说明及联系方式。同时，需确保商户已在微信支付后台开通 WeChat Pay HK 的支付权限。建议商户重新检查申请材料是否齐全，并等待审核结果。",
+      "category": "支付",
+      "difficulty": "easy",
+      "source_doc_title": "wx.openHKOfflinePayView(Object object)"
+    },
+    {
+      "id": "q018",
+      "question": "在微信小程序中使用 cover-image 覆盖原生组件时，图片无法显示，可能是什么原因导致的？",
+      "relevant_chunk_ids": [
+        "919205a2d4700525-f478b1c50a7d473601c5"
+      ],
+      "reference_answer": "cover-image 无法显示图片，通常是因为图片路径错误或图片资源未正确上传至小程序云存储。此外，cover-image 必须嵌套在 cover-view 中才能正常显示，否则会被视为无效节点。同时，cover-image 不支持本地路径，只能使用云存储的网络路径。请检查路径是否正确、资源是否上传，并确保结构嵌套在 cover-view 中。",
+      "category": "视图容器",
+      "difficulty": "easy",
+      "source_doc_title": "cover-image"
+    },
+    {
+      "id": "q019",
+      "question": "在使用 open-data-item 组件时，如何确保其数据能够正确显示？",
+      "relevant_chunk_ids": [
+        "615b84058a166278-5070a8e6ecacb0e5d2ad"
+      ],
+      "reference_answer": "要确保 open-data-item 能够正确显示数据，需满足以下条件：1. 必须将 open-data-item 包裹在 open-data-list 组件内部；2. 确保 open-data-list 组件的 data 属性已正确绑定并包含所需的数据；3. 检查是否在页面的 JSON 配置文件中声明了 open-data-list 组件；4. 确保数据格式符合要求，如对象数组形式。若仍无法显示，检查网络请求是否成功获取数据，以及是否有权限限制导致数据无法展示。",
+      "category": "Skyline",
+      "difficulty": "easy",
+      "source_doc_title": "open-data-item"
+    },
+    {
+      "id": "q020",
+      "question": "在使用 RaycastHit 时，如何设置碰撞点的坐标？",
+      "relevant_chunk_ids": [
+        "7ef70d3cd5e7cc88-4d5e57a2b7d14653a3f2"
+      ],
+      "reference_answer": "在使用 RaycastHit 时，可以通过 set point(v) 方法设置碰撞点的坐标。该方法接收一个 Vector3 类型的参数 v，表示世界空间中的交点坐标。开发者需要确保传入的坐标是有效的 Vector3 实例，以正确设置碰撞点的位置。此方法用于更新 RaycastHit 对象中 point 属性的值，常用于在碰撞检测后调整或记录碰撞位置。",
+      "category": "XR-FRAME",
+      "difficulty": "easy",
+      "source_doc_title": "Class: RaycastHit"
+    },
+    {
+      "id": "q021",
+      "question": "WXML在部分机器上grid网格失效，如何排查和解决？",
+      "relevant_chunk_ids": [
+        "15adc2091136f77d-eaaf6cbe88cd5bbb56f8"
+      ],
+      "reference_answer": "WXML中使用grid网格布局时，若在部分设备上失效，可能是由于浏览器兼容性问题或CSS属性未正确设置。首先检查是否在父容器中设置了display: grid，并确保子元素没有设置float或position属性干扰布局。其次，检查CSS样式是否被覆盖或未正确加载。还可以尝试添加grid-gap或使用CSS变量提升兼容性。若问题依旧，建议使用开发者工具模拟不同设备进行测试。",
+      "category": "XR-FRAME",
+      "difficulty": "medium",
+      "source_doc_title": "网格"
+    },
+    {
+      "id": "q022",
+      "question": "在使用 VideoDecoder.getFrameData() 获取视频帧数据时，为什么可能会返回 NULL？",
+      "relevant_chunk_ids": [
+        "342c5da829b342c4-16b1cdd348a100b038b5"
+      ],
+      "reference_answer": "VideoDecoder.getFrameData() 返回 NULL 的主要原因包括：缓冲区为空，此时无法获取帧数据；或者视频解码器尚未准备好数据。此外，如果视频流中没有可用帧，或者解码过程中出现错误，也可能导致返回 NULL。开发者应检查缓冲区状态、视频流是否正常，并确保解码器已正确初始化以避免此问题。",
+      "category": "媒体",
+      "difficulty": "easy",
+      "source_doc_title": "Object VideoDecoder.getFrameData()"
+    },
+    {
+      "id": "q023",
+      "question": "使用NfcA.transceive接口时，传递的data参数是ArrayBuffer类型，但调用失败，如何排查问题？",
+      "relevant_chunk_ids": [
+        "efd1903fde93a105-f38f52523723fc56dc87"
+      ],
+      "reference_answer": "当使用NfcA.transceive接口时，若data参数为ArrayBuffer类型但调用失败，可能原因包括：1. 传递的ArrayBuffer数据格式不符合NFC标签的协议要求；2. 标签未处于可读写状态；3. 标签未被正确识别或未处于NFCA模式；4. 未正确处理调用失败的fail回调。建议检查数据格式是否符合标签协议，确认标签状态及模式是否正确，并通过fail回调获取具体错误信息进行排查。",
+      "category": "设备",
+      "difficulty": "medium",
+      "source_doc_title": "NfcA.transceive(Object object)"
+    },
+    {
+      "id": "q024",
+      "question": "在开发版或体验版小程序中调用分享到微信运动接口后，如何判断用户是否成功打卡？",
+      "relevant_chunk_ids": [
+        "2a4717619f358965-5e61a33de407477a1c50"
+      ],
+      "reference_answer": "在开发版和体验版中，调用分享到微信运动接口后，接口会返回是否调用成功的状态，开发者可依据此状态判断用户是否成功打卡。但需注意，这些状态不会反映在微信运动中，仅用于开发测试。因此，开发者应以接口返回结果为依据，避免依赖微信运动中的展示来判断打卡成功。同时，需避免重复打卡，确保用户打卡记录的准确性。",
+      "category": "开放能力",
+      "difficulty": "easy",
+      "source_doc_title": "分享数据到微信运动"
+    },
+    {
+      "id": "q025",
+      "question": "在使用 <block wx:if> 包裹多个组件时，如果其中一个组件的 wx:if 条件为 false，其他组件是否还会渲染？",
+      "relevant_chunk_ids": [
+        "969ffa36dc67f1fa-4befbaf6b5f7ec56953c"
+      ],
+      "reference_answer": "不会。因为 <block wx:if> 是一个包装元素，它本身不会渲染，而是根据其 wx:if 条件决定是否渲染其内部的所有子组件。如果 <block wx:if> 的条件为 false，那么其内部的所有组件都不会被渲染。因此，即使其中一个子组件的 wx:if 条件为 true，只要 <block wx:if> 的条件为 false，整个块内的组件都不会被渲染。",
+      "category": "WXML 语法参考",
+      "difficulty": "easy",
+      "source_doc_title": "条件渲染"
+    },
+    {
+      "id": "q026",
+      "question": "在使用 Shoe 鞋部检测接口时，如何正确解析 anchor 结构体中的 transform 字段的 4*4 矩阵数据？",
+      "relevant_chunk_ids": [
+        "23e7d2ac8b150324-173c40479b726d8a8136"
+      ],
+      "reference_answer": "anchor 结构体中的 transform 字段是一个长度为 16 的数组，表示行主序的 4*4 矩阵。开发者在解析时需将数组按行顺序转换为矩阵形式，例如：第 0-3 元素为第一行，第 4-7 元素为第二行，依此类推。矩阵数据通常用于表示鞋子在 3D 空间中的位置、旋转和缩放信息。开发者应确保数组索引正确，避免因顺序错误导致矩阵解析错误。",
+      "category": "基础能力",
+      "difficulty": "easy",
+      "source_doc_title": "Shoe 鞋部检测"
+    },
+    {
+      "id": "q027",
+      "question": "在 PC 端小程序中使用二维码支付时，用户扫码后提示支付失败，可能是什么原因导致？",
+      "relevant_chunk_ids": [
+        "a26d59c9f79897c2-404dd30286642816e4a5"
+      ],
+      "reference_answer": "用户扫码后支付失败，可能是因为二维码已过期（有效期为 5 分钟），或者手机扫码的微信账号与 PC 端小程序的微信公众号账号不一致。此外，还需要检查支付接口是否正确配置，以及用户是否已授权支付权限。建议开发者确保二维码生成后及时展示，并在用户扫码前确认账号一致性。",
+      "category": "PC 小程序",
+      "difficulty": "easy",
+      "source_doc_title": "PC 小程序接入指南"
+    },
+    {
+      "id": "q028",
+      "question": "在使用 page-meta 配置页面属性时，如果将其放在页面第一个节点之后，会导致什么问题？",
+      "relevant_chunk_ids": [
+        "1743bff3fd0d9377-6ad9679a725fa25681a4"
+      ],
+      "reference_answer": "如果 page-meta 节点没有放置在页面的第一个节点位置，会导致该配置无法生效。因为 page-meta 必须是页面内的第一个节点，才能正确配置页面属性和监听页面事件。如果开发者误将 page-meta 放在其他节点之后，会导致页面属性无法被正确读取，从而无法实现诸如设置背景颜色、文字样式等效果。因此，开发者需要确保 page-meta 是页面的第一个节点。",
+      "category": "页面属性配置节点",
+      "difficulty": "easy",
+      "source_doc_title": "page-meta"
+    },
+    {
+      "id": "q029",
+      "question": "如果用户使用的是微信客户端版本6.6.7，但开发者使用了基础库v2.2.0，会导致小程序无法运行吗？",
+      "relevant_chunk_ids": [
+        "2665e8a9bc44f3b6-4cd0621c04863434f9e0"
+      ],
+      "reference_answer": "是的，用户使用微信客户端版本6.6.7时，无法运行基础库v2.2.0。因为根据文档说明，基础库v2.2.0需要客户端版本v6.7.0及以上。基础库的第1、2位版本号更新通常需要依赖新版本的客户端，而v2.2.0属于第2位版本号的更新，因此需要客户端版本升级。开发者应确保目标用户的客户端版本满足基础库的最低要求，或使用兼容性处理方案。",
+      "category": "基础库",
+      "difficulty": "easy",
+      "source_doc_title": "基础库"
+    },
+    {
+      "id": "q030",
+      "question": "在使用小程序插件的 wx.request 发送请求时，服务器端校验 HostSign 签名失败，可能是什么原因导致的？",
+      "relevant_chunk_ids": [
+        "4f1d6b96c9f6bea2-92b0d2c7878c66613d09"
+      ],
+      "reference_answer": "服务器端校验 HostSign 签名失败，可能是由于未正确排序和拼接 APPID、NONCESTR、TIMESTAMP 和 TOKEN 四个参数，或者未使用 sha1 算法计算签名。此外，需确保 NONCESTR 和 TIMESTAMP 与小程序端发送的一致，并注意 TIMESTAMP 是否已过期（每 10 分钟更新一次）。同时，需确认 referer 头格式是否正确，包含小程序的 appid 和版本号。",
+      "category": "插件",
+      "difficulty": "medium",
+      "source_doc_title": "开发插件"
+    },
+    {
+      "id": "q031",
+      "question": "使用 wx.reportAnalytics 上报数据时，上报的事件名和字段名与后台配置不一致，导致数据无法正常显示，应该如何解决？",
+      "relevant_chunk_ids": [
+        "6bafd2e8add50f72-29870226ad1390949aa4"
+      ],
+      "reference_answer": "在使用 wx.reportAnalytics 上报数据前，必须确保事件名和字段名与小程序管理后台自定义分析中配置的一致。事件名是上报的事件类型，如 'purchase'，字段名是数据中的 key，如 'price' 和 'color'。如果字段名或事件名不匹配，数据将无法被正确识别和统计。因此，开发者应严格核对后台配置和代码中的字段名，确保数据上报的准确性。",
+      "category": "数据分析",
+      "difficulty": "easy",
+      "source_doc_title": "wx.reportAnalytics(string eventName, Object data)"
+    },
+    {
+      "id": "q032",
+      "question": "在安卓设备上使用微信小程序进行蓝牙设备连接时，如果未正确关闭连接，会导致什么异常？",
+      "relevant_chunk_ids": [
+        "a799b86da70842df-90767a02cfc860ce23e9"
+      ],
+      "reference_answer": "在安卓设备上，如果未正确关闭蓝牙连接，未及时释放资源，可能会导致 state 133 GATT ERROR 的异常。这是由于系统无法正确管理蓝牙连接状态，进而引发的错误。因此，开发者必须确保每次建立连接后，都成对调用 wx.createBLEConnection 和 wx.closeBLEConnection，以避免此类异常。",
+      "category": "连接硬件能力",
+      "difficulty": "easy",
+      "source_doc_title": "蓝牙低功耗 (Bluetooth Low Energy, BLE)"
+    },
+    {
+      "id": "q033",
+      "question": "在使用wx.offBLEConnectionStateChange取消监听时，如果不传参数是否可以正常取消监听？",
+      "relevant_chunk_ids": [
+        "3a2b4fdba0559601-a661dfe88e8d93e7c78a"
+      ],
+      "reference_answer": "不可以。wx.offBLEConnectionStateChange需要传入与wx.onBLEConnectionStateChange绑定时相同的函数对象作为参数，否则无法正确取消监听。如果不传参数或传入错误的函数对象，可能导致监听未被正确移除，从而引发内存泄漏或重复触发的问题。因此，开发者必须确保传入的函数对象与注册时一致，以保证取消监听的准确性。",
+      "category": "设备",
+      "difficulty": "easy",
+      "source_doc_title": "wx.offBLEConnectionStateChange(function listener)"
+    },
+    {
+      "id": "q034",
+      "question": "在使用 LivePlayerContext.play() 方法播放直播时，为什么在部分真机上无法正常播放，而在开发者工具中可以正常预览？",
+      "relevant_chunk_ids": [
+        "e3d8f261b48234cb-68da6b08d50fddff9a29"
+      ],
+      "reference_answer": "可能原因是在真机上未正确配置直播地址或网络权限，或者直播地址需要 HTTPS 协议。此外，部分设备或系统对直播协议（如 RTMP、HLS）的支持存在差异。建议检查直播地址是否有效、是否使用 HTTPS，以及是否在 app.json 中正确配置了网络请求权限。同时，确保调用 play 方法时传入的参数格式正确。",
+      "category": "媒体",
+      "difficulty": "medium",
+      "source_doc_title": "LivePlayerContext"
+    },
+    {
+      "id": "q035",
+      "question": "在使用 wx.getRealtimeLogManager() 创建 RealtimeLogManager 实例后，调用 info 方法时，部分用户发现日志没有实时显示，是什么原因？",
+      "relevant_chunk_ids": [
+        "681d0830fc8756aa-a0369cc1d98fa4eec01a"
+      ],
+      "reference_answer": "可能原因是在插件环境中，RealtimeLogManager 的 info 方法没有被正确调用，或者没有在页面生命周期中正确初始化。此外，部分用户可能未正确配置日志输出权限或未在开发者工具中开启实时日志功能。建议检查是否在页面 onShow 生命周期中初始化 RealtimeLogManager，并确保在开发者工具中开启实时日志选项。",
+      "category": "基础",
+      "difficulty": "medium",
+      "source_doc_title": "RealtimeLogManager wx.getRealtimeLogManager()"
+    },
+    {
+      "id": "q036",
+      "question": "video组件的show-bottom-progress属性在真机上不生效，如何解决？",
+      "relevant_chunk_ids": [
+        "4eab3b3096c1bec8-a0f340c0014497c064a1"
+      ],
+      "reference_answer": "video组件的show-bottom-progress属性在真机上不生效，通常是因为该属性在某些版本的微信基础库中存在兼容性问题。建议检查微信基础库版本是否为最新，或尝试在页面的onLoad生命周期中使用wx.createVideoContext方法手动控制进度条的显示。此外，确保video组件的父容器没有设置overflow: hidden，以免遮挡进度条。若问题仍存在，可尝试使用progress组件替代，或在官方文档中查找该属性的兼容性说明。",
+      "category": "基础内容",
+      "difficulty": "medium",
+      "source_doc_title": "progress"
+    },
+    {
+      "id": "q037",
+      "question": "在使用 aria-component 时，如何确保按钮的 label 正确地被屏幕阅读器读出？",
+      "relevant_chunk_ids": [
+        "78dc09105350cc80-a646813145a7f65f82bc"
+      ],
+      "reference_answer": "在使用 aria-component 时，确保按钮的 label 正确被屏幕阅读器读出，需要为按钮设置 aria-label 属性。如果按钮有文本内容，建议同时使用 aria-labelledby 指向对应的 label 元素，以增强可访问性。此外，应确保按钮的文本内容清晰且具有语义，避免使用模糊的文本如'点击这里'。在组件内部，应正确绑定 aria-label 属性，并在必要时通过 aria-hidden 控制辅助文本的可见性，以避免屏幕阅读器读取不必要的信息。",
+      "category": "无障碍访问",
+      "difficulty": "easy",
+      "source_doc_title": "aria-component"
+    },
+    {
+      "id": "q038",
+      "question": "使用 Animation.rotateZ 方法时，如果传入的旋转角度超出 [-180, 180] 范围，会导致什么问题？",
+      "relevant_chunk_ids": [
+        "84bb3616959906f3-fe3a69a630e4444482a9"
+      ],
+      "reference_answer": "当使用 Animation.rotateZ 方法传入的旋转角度超出 [-180, 180] 的范围时，小程序会忽略超出部分的值，只保留符合范围内的部分进行旋转。例如，传入 270 度时，实际只会旋转 90 度。因此，开发者应确保传入的角度值在有效范围内，以避免预期外的旋转效果。",
+      "category": "界面",
+      "difficulty": "easy",
+      "source_doc_title": "Animation Animation.rotateZ(number angle)"
+    },
+    {
+      "id": "q039",
+      "question": "在使用微信小程序地图组件时，通过 setData 单独设置 rotate 或 skew 属性，但发现动画效果未生效，如何解决？",
+      "relevant_chunk_ids": [
+        "8b2d1c66eed18803-f835cb4654749560df0b"
+      ],
+      "reference_answer": "当通过 setData 单独设置 rotate 或 skew 属性时，这些动画属性无法同时生效。这是因为 rotate 和 skew 属于地图的动画配置，必须通过 setting 对象统一设置，而不是通过 setData 分开设置。开发者应将这些属性统一放入 setting 对象中，并通过 setData 设置整个 setting 对象，以确保动画属性正确生效。",
+      "category": "地图",
+      "difficulty": "medium",
+      "source_doc_title": "map"
+    },
+    {
+      "id": "q040",
+      "question": "使用 captureToLocalPath 方法截屏保存到本地路径时，回调函数未被正确调用，导致文件未被释放，如何解决？",
+      "relevant_chunk_ids": [
+        "0b1f22ed16aa8b81-f55d2db149942b6a465a"
+      ],
+      "reference_answer": "在使用 captureToLocalPath 方法时，确保传入的 options 参数正确，并在 callback 回调中处理结果。如果回调未被调用，可能是由于异步处理未完成或未正确绑定回调函数。在 v2.27.1 版本之后，该方法支持同步和异步处理，开发者应确保在异步操作完成后调用 callback，以确保文件被正确释放。若使用同步方式，需注意避免阻塞主线程。",
+      "category": "XR-FRAME",
+      "difficulty": "medium",
+      "source_doc_title": "Class: ShareSystem"
+    }
+  ]
+}

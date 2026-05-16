@@ -35,6 +35,7 @@ class SentenceTransformerEmbedder(BaseEmbedder):
 
         if offline:
             os.environ["HF_HUB_OFFLINE"] = "1"
+            os.environ["TRANSFORMERS_OFFLINE"] = "1"
 
         self._model = SentenceTransformer(
             model_name,

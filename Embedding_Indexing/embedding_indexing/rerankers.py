@@ -23,6 +23,7 @@ class CrossEncoderReranker(BaseReranker):
 
         if offline:
             os.environ["HF_HUB_OFFLINE"] = "1"
+            os.environ["TRANSFORMERS_OFFLINE"] = "1"
 
         with _proxy_guard(enabled=offline):
             self._model = CrossEncoder(
