@@ -6,7 +6,7 @@ import typer
 
 from llm.api import create_app
 from llm.config import load_settings
-from llm.service import answer_question
+from llm.service import build_service
 
 
 app = typer.Typer(help="Local-model RAG QA over the indexed WeChat docs.")
@@ -16,12 +16,24 @@ app = typer.Typer(help="Local-model RAG QA over the indexed WeChat docs.")
 def ask(
     question: str,
     top_k: int | None = typer.Option(None, min=1, help="Number of chunks to retrieve before generation."),
+    provider: str = typer.Option(
+        "ollama", help="Generation provider: 'ollama' (local) or 'deepseek' (API)."
+    ),
 ) -> None:
-    result = answer_question(question=question, top_k=top_k)
-    typer.echo(result.answer)
+    settings = load_settings()
+    settings.generation_provider = provider
+    service = build_service(settings)
+    citations: list[object] = []
+
+    for event in service.stream_answer_question(question=question, top_k=top_k or settings.top_k):
+        if event["event"] == "delta":
+            typer.echo(str(event["data"].get("text") or ""), nl=False)
+        elif event["event"] == "citations":
+            citations = list(event["data"].get("citations") or [])
+
     typer.echo("")
     typer.echo("Citations:")
-    typer.echo(json.dumps([item.to_dict() for item in result.citations], ensure_ascii=False, indent=2))
+    typer.echo(json.dumps(citations, ensure_ascii=False, indent=2))
 
 
 @app.command()

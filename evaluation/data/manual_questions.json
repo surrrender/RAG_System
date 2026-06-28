@@ -1,0 +1,370 @@
+{
+  "meta": {
+    "dataset_name": "wechat-miniprogram-manual-eval-v1",
+    "created_at": "2026-05-16",
+    "total_questions": 40,
+    "description": "人工收集的 40 个微信小程序开发相关问题及答案"
+  },
+  "questions": [
+    {
+      "id": "q001",
+      "question": "微信小程序的 app.json 有哪些常用配置项？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "app.json 是全局配置文件，常用配置项包括：pages（页面路径）、window（全局窗口配置）、tabBar（底部导航）、subpackages（分包配置）、plugins（插件配置）、usingComponents（全局组件）、networkTimeout（网络超时）、style（样式版本）、sitemapLocation（sitemap 位置）等。",
+      "category": "基础配置与框架",
+      "difficulty": "easy",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q002",
+      "question": "project.config.json 的作用是什么？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "project.config.json 是微信小程序的开发工具配置文件，用于设置项目的 AppID、编译配置（如 ES6 转换开关）、上传设置、项目名称等。这些配置仅影响开发者工具的行为，不会影响小程序的线上运行效果。",
+      "category": "基础配置与框架",
+      "difficulty": "easy",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q003",
+      "question": "小程序页面生命周期和应用生命周期分别有哪些？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "应用生命周期：onLaunch（初始化完成时触发）、onShow（启动或从后台切到前台时触发）、onHide（从前台切到后台时触发）、onError（脚本错误或 API 调用失败时触发）。页面生命周期：onLoad（页面加载时触发）、onShow（页面显示时触发）、onReady（页面初次渲染完成时触发）、onHide（页面隐藏时触发）、onUnload（页面卸载时触发）。执行顺序依次为：App.onLaunch → App.onShow → Page.onLoad → Page.onShow → Page.onReady。",
+      "category": "基础配置与框架",
+      "difficulty": "medium",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q004",
+      "question": "小程序的运行机制是什么？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "小程序采用双线程架构：逻辑层运行在 JSCore 中，负责处理业务逻辑和 API 调用；渲染层运行在 WebView 中，负责页面渲染。两个线程之间通过 Native 层进行通信，数据传递流程为：setData → Native → WebView。这种架构隔离了逻辑和渲染，提升了安全性和性能。",
+      "category": "基础配置与框架",
+      "difficulty": "medium",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q005",
+      "question": "微信小程序为什么不能直接操作 DOM？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "因为小程序采用双线程架构，逻辑层（JSCore）中没有 DOM API，页面在独立的 WebView 中渲染。JavaScript 代码运行在 JSCore 环境中而非浏览器环境中，因此无法直接使用 document.getElementById() 等 DOM 操作方法。所有界面更新必须通过 setData 驱动，由框架层将数据同步到渲染层。",
+      "category": "基础配置与框架",
+      "difficulty": "easy",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q006",
+      "question": "WXML 和 HTML 有什么区别？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "WXML 是微信小程序自定义的标记语言，与 HTML 的主要区别包括：WXML 使用微信自定义标签（如 view、text），支持数据绑定（{{}}），支持 wx:if 条件渲染和 wx:for 列表渲染等指令。WXML 的语法风格更类似 Vue 模板，而非原生 HTML。HTML 是浏览器标准标签，原生不支持数据绑定。",
+      "category": "基础配置与框架",
+      "difficulty": "easy",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q007",
+      "question": "WXSS 与 CSS 的区别有哪些？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "WXSS 与 CSS 的主要区别：1）响应式单位 rpx：750rpx 等于屏幕宽度，方便适配不同屏幕；2）样式隔离：页面之间默认样式隔离，不会互相影响；3）选择器限制：不支持 body 等全局选择器，不支持 id 复杂嵌套。WXSS 在 CSS 基础上进行了裁剪和扩展，以适应小程序的组件化开发模式。",
+      "category": "基础配置与框架",
+      "difficulty": "easy",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q008",
+      "question": "WXML 的数据绑定语法如何使用？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "WXML 数据绑定使用 Mustache 语法（双花括号）。插值：<view>{{msg}}</view>。属性绑定：<view id=\"{{id}}\"></view>。条件渲染：<view wx:if=\"{{show}}\"></view>。列表渲染：<view wx:for=\"{{list}}\"></view>。数据绑定的值来自对应页面的 data 对象或组件的 data 属性。",
+      "category": "基础配置与框架",
+      "difficulty": "easy",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q009",
+      "question": "微信小程序中的事件机制是什么？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "事件绑定使用 bind 前缀（如 bindtap），事件不冒泡。catch 前缀可阻止冒泡（如 catchtap）。捕获阶段使用 capture-bind 和 capture-catch。事件对象 e 包含 currentTarget（事件绑定组件）和 target（触发事件的组件）。事件机制支持触摸事件、表单事件等，主要用于处理用户交互。",
+      "category": "基础配置与框架",
+      "difficulty": "medium",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q010",
+      "question": "微信小程序的页面栈是什么？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "小程序以栈结构管理页面。可以通过 getCurrentPages() 获取当前页面栈实例。页面栈最大层级为 10 层，超过限制会导致页面无法正常打开。页面跳转时，新页面入栈；返回时，页面出栈。开发者需要注意页面栈深度，避免无限跳转导致栈溢出。",
+      "category": "基础配置与框架",
+      "difficulty": "easy",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q011",
+      "question": "wx:if 和 hidden 的区别是什么？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "wx:if 是条件渲染指令，当条件为 false 时会真正销毁节点，不渲染到 DOM 中，切换开销较大。hidden 通过 display:none 控制元素显示隐藏，节点始终保留在 DOM 中，切换开销较小。使用建议：频繁切换时应使用 hidden，减少 DOM 操作；不频繁切换时使用 wx:if，减少初始渲染负担。",
+      "category": "条件渲染与列表渲染",
+      "difficulty": "easy",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q012",
+      "question": "wx:for 如何使用？key 为什么重要？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "wx:for 用于列表渲染，语法为：<view wx:for=\"{{list}}\" wx:key=\"id\">{{item.name}}</view>。key 的作用是帮助框架进行 diff 优化，通过唯一标识符准确识别每个列表项的变化，减少不必要的 DOM 重渲染，提升列表渲染性能。建议为每个列表项指定稳定的唯一 key。",
+      "category": "条件渲染与列表渲染",
+      "difficulty": "easy",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q013",
+      "question": "block 标签有什么作用？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "block 标签是一个逻辑包裹元素，用于对多个组件进行分组控制，但本身不会渲染到页面中。常用于配合 wx:if、wx:for 等指令批量控制多个元素的渲染，例如 <block wx:for=\"{{list}}\">...</block>。这样可以避免添加多余的 DOM 层级，保持页面结构整洁。",
+      "category": "条件渲染与列表渲染",
+      "difficulty": "easy",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q014",
+      "question": "template 模板如何使用？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "template 是 WXML 中的模板复用机制。定义模板使用 <template name=\"item\">...</template>，使用模板时通过 <template is=\"item\" data=\"{{...item}}\" /> 引用。模板可以复用布局结构，减少重复代码，提高开发效率。模板本身不会渲染，只有在被使用时才会渲染。",
+      "category": "条件渲染与列表渲染",
+      "difficulty": "easy",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q015",
+      "question": "slot 插槽机制是什么？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "slot 是组件的插槽机制，允许父组件向子组件传递内容。单 slot 直接使用 <slot></slot>；多 slot 需要在组件的 json 中配置 \"multipleSlots\": true，然后通过 name 属性区分不同的 slot。插槽机制使组件更加灵活，可以在保留组件样式的同时插入自定义内容。",
+      "category": "条件渲染与列表渲染",
+      "difficulty": "medium",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q016",
+      "question": "小程序中如何使用自定义组件？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "使用自定义组件分为三步：1）创建组件文件，使用 Component({}) 定义组件的属性、数据和生命周期；2）在页面的 json 配置文件中通过 usingComponents 字段引入组件，如 \"my-com\": \"/components/my\"；3）在 WXML 中使用组件，如 <my-com />。组件可以像页面一样拥有独立的样式、数据和逻辑。",
+      "category": "自定义组件",
+      "difficulty": "medium",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q017",
+      "question": "properties、data、methods 的作用？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "properties 用于接收父组件传递的数据，类似外部接口；data 用于维护组件内部的本地状态数据，组件内部私有；methods 用于定义组件的方法，处理组件内部的交互逻辑和业务。三者协同工作：properties 接收外部输入，data 存储内部状态，methods 处理行为和交互。",
+      "category": "自定义组件",
+      "difficulty": "easy",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q018",
+      "question": "properties 和 data 的区别是什么？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "properties 是组件对外公开的属性，数据由父组件传入，可通过 observer 监听变化；data 是组件内部维护的私有数据，不能从外部直接修改。区别在于：properties 用于父子通信（外部传入），data 用于本地状态管理（内部维护），properties 支持监听变化而 data 不需要。",
+      "category": "自定义组件",
+      "difficulty": "easy",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q019",
+      "question": "组件生命周期有哪些？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "组件生命周期通过 lifetimes 对象定义，包括：created（组件实例刚被创建时触发，此时不能调用 setData）、attached（组件被插入到页面节点树时触发）、ready（组件布局完成时触发）、detached（组件从页面节点树移除时触发）。其中 created 和 attached 之间不能使用 setData，这是常见的开发者误区。",
+      "category": "自定义组件",
+      "difficulty": "medium",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q020",
+      "question": "component 和 page 生命周期区别？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "Page 生命周期是页面级别的，包括 onLoad、onShow、onReady、onHide、onUnload，适用于整个页面的加载和卸载管理。Component 生命周期是组件级别的，粒度更细，包括 created、attached、ready、detached。组件的生命周期在页面生命周期之上叠加运行，一个页面中的多个组件各自独立管理其生命周期。",
+      "category": "自定义组件",
+      "difficulty": "medium",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q021",
+      "question": "如何实现组件间通信？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "组件间通信有三种方式：1）父组件向子组件传值通过 properties；2）子组件向父组件通信通过 triggerEvent() 触发自定义事件，在父组件中通过 bind 监听；3）在父组件中通过 selectComponent() 获取子组件实例，直接调用其方法。推荐使用前两种方式，保持单向数据流。",
+      "category": "自定义组件",
+      "difficulty": "medium",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q022",
+      "question": "behaviors 是什么？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "behaviors 是微信小程序的代码复用机制，类似于 Vue 的 mixin。用于在多个组件间复用相同的属性、数据、生命周期和方法。多个组件可以通过引用同一个 behavior 来共享公共逻辑，减少代码重复。behavior 中的生命周期会按照合并规则与组件自身的生命周期合并执行。",
+      "category": "自定义组件",
+      "difficulty": "medium",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q023",
+      "question": "页面跳转方式有哪些？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "页面跳转方式包括：navigateTo（保留当前页面，跳转到新页面，可返回）、redirectTo（关闭当前页面，跳转到新页面，不可返回）、switchTab（跳转到 TabBar 页面，关闭所有非 TabBar 页面）、reLaunch（关闭所有页面，打开指定页面）、navigateBack（返回上一页或指定层级的页面）。",
+      "category": "页面跳转与路由",
+      "difficulty": "easy",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q024",
+      "question": "reLaunch 和 navigateBack 的作用？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "reLaunch 用于关闭所有已有页面，重新打开指定页面，相当于重置页面栈。navigateBack 用于返回上一页或指定层级的页面，通过 delta 参数控制返回层级（如 delta: 1 返回上一页）。reLaunch 会清空整个页面栈，而 navigateBack 只会弹出部分页面。",
+      "category": "页面跳转与路由",
+      "difficulty": "easy",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q025",
+      "question": "页面传参有哪些方式？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "页面传参有三种方式：1）URL 传参，在跳转路径后拼接 ?id=1 参数，在目标页面的 onLoad 中通过 options 接收；2）EventChannel 传参，用于页面间通信，适合传递复杂数据；3）storage 本地缓存，通过 wx.setStorageSync 存储，在目标页面读取。URL 传参适合简单参数，EventChannel 适合页面间事件和数据交互。",
+      "category": "页面跳转与路由",
+      "difficulty": "medium",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q026",
+      "question": "TabBar 为什么不能 navigateTo？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "TabBar 页面是小程序的一级页面，属于底部导航栏中的页面。使用 navigateTo 会保留当前页面并压入页面栈，但 TabBar 页面应该直接切换而非堆叠。因此跳转 TabBar 页面必须使用 switchTab 方法，该方法会关闭所有非 TabBar 页面并切换到指定的 TabBar 页面。",
+      "category": "页面跳转与路由",
+      "difficulty": "easy",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q027",
+      "question": "页面之间如何通信？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "页面间通信有多种方式：URL 参数传递（适合简单数据）、本地存储 storage（适合跨页面持久数据）、EventChannel（适合页面间双向通信）、全局变量（通过 App 实例或全局对象共享数据）。EventChannel 是最灵活的方案，支持在页面跳转时建立通信通道，进行双向数据传递和事件通知。",
+      "category": "页面跳转与路由",
+      "difficulty": "medium",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q028",
+      "question": "wx.request 限制和域名要求？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "wx.request 的要求和限制：1）必须使用 HTTPS 协议；2）需在微信公众平台后台配置合法域名；3）并发请求数最多 10 个。开发者需要确保服务器域名已备案且在后台完成配置，同时注意控制并发请求数量，避免超过限制导致请求失败。",
+      "category": "网络请求与登录",
+      "difficulty": "easy",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q029",
+      "question": "request、uploadFile、downloadFile 区别？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "wx.request 用于发送普通 HTTP 请求，支持 GET/POST 等方法。wx.uploadFile 用于文件上传，支持 multipart/form-data 格式，适合上传图片、文件等。wx.downloadFile 用于文件下载，将远程文件下载到临时路径。三者用途不同：request 用于 API 调用，uploadFile 用于上传资源，downloadFile 用于下载资源。",
+      "category": "网络请求与登录",
+      "difficulty": "easy",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q030",
+      "question": "如何获取 code？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "通过调用 wx.login 接口获取临时登录凭证 code。示例：wx.login({ success(res) { console.log(res.code) } })。code 用于向微信服务器换取 session_key 和 openid，是登录流程的第一步。code 有效期较短，通常为 5 分钟，且只能使用一次。",
+      "category": "网络请求与登录",
+      "difficulty": "easy",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q031",
+      "question": "wx.login 和 wx.getUserProfile 的关系？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "wx.login 用于获取登录凭证 code，用于服务端登录验证和用户身份识别（获取 openid）。wx.getUserProfile 用于获取用户的头像、昵称等公开信息，需要用户授权。两者功能不同：login 用于登录认证，getUserProfile 用于获取用户个人信息。通常登录流程中先调用 login，再根据需要调用 getUserProfile。",
+      "category": "网络请求与登录",
+      "difficulty": "medium",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q032",
+      "question": "小程序登录流程是什么？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "小程序登录流程：1）调用 wx.login 获取临时 code；2）将 code 发送到开发者服务端；3）服务端调用 code2Session 接口，获取 openid 和 session_key；4）服务端根据 openid 创建或匹配用户账号，并生成自定义登录态 token；5）返回 token 给小程序端，后续请求携带 token 进行身份认证。",
+      "category": "网络请求与登录",
+      "difficulty": "medium",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q033",
+      "question": "如何实现 token 登录？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "Token 登录流程：1）用户登录后，服务端验证身份并签发 token；2）小程序端将 token 保存在 storage 中；3）后续每次请求在 header 中携带 token；4）服务端验证 token 合法性并返回数据。Token 通常有时效性，需要在过期前刷新或重新登录。这种方式避免了每次请求都需要传递登录凭证。",
+      "category": "网络请求与登录",
+      "difficulty": "medium",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q034",
+      "question": "如何使用本地缓存 API？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "本地缓存 API 包括：wx.setStorageSync(key, data) 同步写入缓存、wx.getStorageSync(key) 同步读取缓存、wx.removeStorageSync(key) 同步删除指定缓存、wx.clearStorageSync() 清空所有缓存。每个小程序有存储上限（通常 10MB），缓存数据在用户卸载小程序时清除。同步方法会阻塞线程，异步方法性能更好。",
+      "category": "缓存、文件与媒体",
+      "difficulty": "easy",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q035",
+      "question": "同步缓存和异步缓存区别？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "同步缓存方法（Sync 后缀）会阻塞当前线程，直到操作完成才继续执行后续代码，适合在关键路径上需要立即获取数据的场景。异步缓存方法（无 Sync 后缀）不会阻塞线程，通过 success/fail 回调返回结果，性能更好。建议在非关键路径上使用异步方式，避免阻塞 UI 线程导致卡顿。",
+      "category": "缓存、文件与媒体",
+      "difficulty": "easy",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q036",
+      "question": "如何上传和下载文件？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "文件上传使用 wx.uploadFile() 接口，可以上传本地资源到服务器。文件下载使用 wx.downloadFile() 接口，将远程文件下载到临时路径。文件系统操作通过 FileSystemManager 对象进行管理，支持读取、写入、删除等操作。上传和下载都需要在后台配置合法域名，且注意文件大小限制。",
+      "category": "缓存、文件与媒体",
+      "difficulty": "easy",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q037",
+      "question": "如何实现图片懒加载与预览？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "图片懒加载通过在 image 组件上设置 lazy-load 属性实现，页面滚动时只有进入可视区域的图片才会加载，减少初始加载资源。图片预览使用 wx.previewImage() 接口，支持传入当前图片 URL 和图片列表 URLs 数组，用户可以在预览界面左右滑动查看多张图片。",
+      "category": "缓存、文件与媒体",
+      "difficulty": "easy",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q038",
+      "question": "如何使用地图与定位 API？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "获取用户当前位置使用 wx.getLocation()，选择位置使用 wx.chooseLocation()。地图组件使用 <map />，支持标记点、路线规划、区域覆盖等丰富功能。使用定位相关 API 需要在 app.json 中声明 requiredPrivateInfos 字段，并获取用户授权。地图组件支持个性化样式配置和事件交互。",
+      "category": "定位、地图与设备API",
+      "difficulty": "medium",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q039",
+      "question": "如何调用扫码、相机、蓝牙等能力？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "扫码使用 wx.scanCode() 接口，支持二维码和条形码扫描。相机能力使用 camera 组件或在 API 中调用相关接口。蓝牙能力通过 wx.openBluetoothAdapter() 初始化蓝牙适配器，然后调用搜索、连接、通信等系列接口。这些硬件能力都需要用户授权，并在 app.json 中声明所需权限。",
+      "category": "定位、地图与设备API",
+      "difficulty": "medium",
+      "source_doc_title": ""
+    },
+    {
+      "id": "q040",
+      "question": "小程序如何进行性能优化？",
+      "relevant_chunk_ids": [],
+      "reference_answer": "小程序性能优化的主要措施：1）减少 setData 的数据量和频率；2）分包加载，将代码拆分为主包和分包；3）图片压缩和 CDN 加速；4）使用骨架屏提升首屏体验；5）图片懒加载减少初始加载量；6）合理合并网络请求；7）避免频繁渲染和重排；8）使用独立分包优化特定页面加载；9）长列表使用虚拟化渲染；10）按需加载组件和资源。",
+      "category": "定位、地图与设备API",
+      "difficulty": "hard",
+      "source_doc_title": ""
+    }
+  ]
+}

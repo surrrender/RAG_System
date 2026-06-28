@@ -4,7 +4,8 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from llm.config import Settings, load_settings
-from llm.models import Citation, ConversationSummary, ConversationTurn, StoredMessage
+from llm.generator import DeepSeekGenerator, Generator, OllamaGenerator
+from llm.models import Citation, ConversationTurn, StoredMessage
 from llm.prompting import MAX_HISTORY_TURNS
 from llm.service import QAService, build_service
 from llm.storage import ConversationNotFoundError, ConversationStore
@@ -67,6 +68,10 @@ def create_app(
         conversation_id: str = Field(min_length=1)
         question: str = Field(min_length=1)
         top_k: int = Field(default=current.top_k, ge=1, le=20)
+        generation_provider: str | None = Field(
+            default=None,
+            description="Generation provider: 'ollama' or 'deepseek'. Defaults to config.",
+        )
         history: list[HistoryTurn] = Field(default_factory=list)
 
         @field_validator("user_id", "conversation_id", "question")
@@ -106,13 +111,6 @@ def create_app(
         url: str | None = None
         section_path: list[str] | None = None
         text: str | None = None
-
-    class QAResponse(BaseModel):
-        question: str
-        answer: str
-        citations: list[CitationResponse]
-        model: str
-        retrieval_count: int
 
     class ConversationResponse(BaseModel):
         id: str
@@ -175,49 +173,6 @@ def create_app(
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         return [MessageResponse.model_validate(item.to_dict()) for item in messages]
 
-    @app.post("/qa", response_model=QAResponse)
-    def ask(payload: QARequest = Body(...)) -> QAResponse:
-        try:
-            stored_history, assistant_message = conversation_store.begin_assistant_response(
-                user_id=payload.user_id,
-                conversation_id=payload.conversation_id,
-                question=payload.question,
-                history_limit=HISTORY_WINDOW_MESSAGES,
-            )
-        except ConversationNotFoundError as exc:
-            raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-        history = _resolve_prompt_history(stored_history=stored_history, fallback_history=payload.history)
-        try:
-            result = qa_service.answer_question(
-                question=payload.question,
-                top_k=payload.top_k,
-                history=history,
-            )
-        except Exception as exc:
-            conversation_store.update_message(
-                user_id=payload.user_id,
-                conversation_id=payload.conversation_id,
-                message_id=assistant_message.id,
-                content=str(exc),
-                status="error",
-                citations=[],
-                model=None,
-                retrieval_count=None,
-            )
-            raise
-        conversation_store.update_message(
-            user_id=payload.user_id,
-            conversation_id=payload.conversation_id,
-            message_id=assistant_message.id,
-            content=result.answer,
-            status="done",
-            citations=[Citation(**item.to_dict()) for item in result.citations],
-            model=result.model,
-            retrieval_count=result.retrieval_count,
-        )
-        return QAResponse.model_validate(result.to_dict())
-
     @app.post("/qa/stream")
     def ask_stream(payload: QARequest = Body(...)) -> StreamingResponse:
         try:
@@ -232,6 +187,7 @@ def create_app(
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
         history = _resolve_prompt_history(stored_history=stored_history, fallback_history=payload.history)
+        per_request_generator = _build_per_request_generator(payload.generation_provider, current)
 
         def event_stream() -> Any:
             citations: list[Citation] = []
@@ -244,6 +200,7 @@ def create_app(
                     question=payload.question,
                     top_k=payload.top_k,
                     history=history,
+                    generator=per_request_generator,
                 ):
                     should_stop = False
                     if event["event"] == "meta":
@@ -308,6 +265,27 @@ def create_app(
         )
 
     return app
+
+
+def _build_per_request_generator(provider: str | None, current: Settings) -> Generator | None:
+    if provider is None:
+        return None
+    if provider == "deepseek":
+        if not current.deepseek_api_key:
+            raise ValueError("DeepSeek API key is not configured (set LLM_DEEPSEEK_API_KEY).")
+        return DeepSeekGenerator(
+            api_key=current.deepseek_api_key,
+            model=current.deepseek_model,
+            api_base=current.deepseek_api_base,
+            timeout=current.request_timeout,
+        )
+    if provider == "ollama":
+        return OllamaGenerator(
+            host=current.ollama_host,
+            model=current.generation_model,
+            timeout=current.request_timeout,
+        )
+    raise ValueError(f"Unknown generation provider: {provider!r}. Supported: 'ollama', 'deepseek'.")
 
 
 def _encode_sse(event: object, data: object) -> str:

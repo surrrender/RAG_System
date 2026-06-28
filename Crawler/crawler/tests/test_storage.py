@@ -11,12 +11,9 @@ def test_chunk_record_serialization_fields_complete() -> None:
         title="Title",
         nav_path=["框架"],
         section_path=["章节"],
-        chunk_type="text",
         chunk_text="body",
         token_estimate=1,
         fetched_at="2026-03-10T00:00:00+00:00",
-        related_code_ids=["chunk-2"],
-        related_text_ids=[],
     )
     serialized = json.loads(json.dumps(record.to_dict(), ensure_ascii=False))
     assert set(serialized) == {
@@ -26,10 +23,7 @@ def test_chunk_record_serialization_fields_complete() -> None:
         "title",
         "nav_path",
         "section_path",
-        "chunk_type",
         "chunk_text",
         "token_estimate",
         "fetched_at",
-        "related_code_ids",
-        "related_text_ids",
     }

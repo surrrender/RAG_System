@@ -47,10 +47,10 @@ def test_retriever_normalizes_results() -> None:
         assert kwargs["index"] == "INDEX"
         assert kwargs["reranker"] == "RERANKER"
         assert kwargs["enable_reranker"] is True
-        assert kwargs["rerank_candidate_limit"] == 5
+        assert kwargs["rerank_candidate_limit"] == 10
         assert isinstance(kwargs["stage_metrics"], dict)
         assert kwargs["query"] == "test"
-        assert kwargs["limit"] == 2
+        assert kwargs["limit"] == max(2, 10)
         kwargs["stage_metrics"]["embed_ms"] = 1.5
         kwargs["stage_metrics"]["vector_search_ms"] = 2.5
         kwargs["stage_metrics"]["rerank_ms"] = 3.5

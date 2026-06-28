@@ -3,7 +3,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from llm.api import create_app
-from llm.models import AnswerResult, Citation
+from llm.models import Citation
 from llm.storage import ConversationStore
 
 
@@ -49,37 +49,14 @@ class RecordingConversationStore(ConversationStore):
 
 class StubService:
     def __init__(self) -> None:
-        self.calls: list[tuple[str, int, list[dict[str, str]]]] = []
         self.stream_calls: list[tuple[str, int, list[dict[str, str]]]] = []
         self.warm_up_calls = 0
 
     def warm_up(self) -> None:
         self.warm_up_calls += 1
 
-    def answer_question(self, question: str, top_k: int, history: list[object] | None = None) -> AnswerResult:
-        normalized_history = [
-            {"role": getattr(item, "role"), "content": getattr(item, "content")} for item in (history or [])
-        ]
-        self.calls.append((question, top_k, normalized_history))
-        return AnswerResult(
-            question=question,
-            answer="answer",
-            citations=[
-                Citation(
-                    chunk_id="chunk-1",
-                    score=0.9,
-                    title="App",
-                    url="https://example.com/app",
-                    section_path=["生命周期"],
-                    text="App onLaunch",
-                )
-            ],
-            model="llama3.1:8b",
-            retrieval_count=1,
-        )
-
     def stream_answer_question(
-        self, question: str, top_k: int, history: list[object] | None = None
+        self, question: str, top_k: int, history: list[object] | None = None, **kwargs: object
     ) -> list[dict[str, object]]:
         normalized_history = [
             {"role": getattr(item, "role"), "content": getattr(item, "content")} for item in (history or [])
@@ -91,15 +68,15 @@ class StubService:
                 "data": {
                     "question": question,
                     "model": "llama3.1:8b",
-                "retrieval_count": 1,
-                "server_started_at_ms": 0.0,
-                "retrieval_finished_at_ms": 12.5,
-                "server_embed_ms": 1.5,
-                "server_vector_search_ms": 2.5,
-                "server_rerank_ms": 3.5,
-                "server_prompt_build_ms": 4.5,
+                    "retrieval_count": 1,
+                    "server_started_at_ms": 0.0,
+                    "retrieval_finished_at_ms": 12.5,
+                    "server_embed_ms": 1.5,
+                    "server_vector_search_ms": 2.5,
+                    "server_rerank_ms": 3.5,
+                    "server_prompt_build_ms": 4.5,
+                },
             },
-        },
             {"event": "delta", "data": {"text": "ans", "server_first_token_at_ms": 34.0}},
             {"event": "delta", "data": {"text": "wer"}},
             {
@@ -163,7 +140,7 @@ def test_conversation_crud_and_user_isolation(tmp_path: Path) -> None:
     assert client.get("/conversations", params={"user_id": "user-a"}).json() == []
 
 
-def test_post_qa_persists_messages_and_uses_stored_history(tmp_path: Path) -> None:
+def test_post_qa_stream_uses_stored_history_and_persists_final_answer(tmp_path: Path) -> None:
     client, store = _create_client(tmp_path)
     service = client.app.state.stub_service
     conversation = store.create_conversation(user_id="user-a")
@@ -179,100 +156,6 @@ def test_post_qa_persists_messages_and_uses_stored_history(tmp_path: Path) -> No
         conversation_id=conversation.id,
         role="assistant",
         content="App 是小程序入口。",
-        status="done",
-    )
-
-    response = client.post(
-        "/qa",
-        json={
-            "user_id": "user-a",
-            "conversation_id": conversation.id,
-            "question": "App 生命周期是什么？",
-            "top_k": 4,
-            "history": [{"role": "user", "content": "这段 history 不该被优先使用"}],
-        },
-    )
-
-    assert response.status_code == 200
-    assert response.json()["answer"] == "answer"
-    assert service.calls == [
-        (
-            "App 生命周期是什么？",
-            4,
-            [
-                {"role": "user", "content": "先介绍 App"},
-                {"role": "assistant", "content": "App 是小程序入口。"},
-            ],
-        )
-    ]
-
-    stored_messages = client.get(
-        f"/conversations/{conversation.id}/messages",
-        params={"user_id": "user-a"},
-    ).json()
-    assert [item["role"] for item in stored_messages] == ["user", "assistant", "user", "assistant"]
-    assert stored_messages[-1]["content"] == "answer"
-
-
-def test_post_qa_only_loads_recent_history_window(tmp_path: Path) -> None:
-    client, store = _create_client(tmp_path)
-    service = client.app.state.stub_service
-    conversation = store.create_conversation(user_id="user-a")
-
-    for index in range(1, 6):
-        store.add_message(
-            user_id="user-a",
-            conversation_id=conversation.id,
-            role="user",
-            content=f"u{index}",
-            status="done",
-        )
-        store.add_message(
-            user_id="user-a",
-            conversation_id=conversation.id,
-            role="assistant",
-            content=f"a{index}",
-            status="done",
-        )
-
-    response = client.post(
-        "/qa",
-        json={
-            "user_id": "user-a",
-            "conversation_id": conversation.id,
-            "question": "App 生命周期是什么？",
-            "top_k": 4,
-        },
-    )
-
-    assert response.status_code == 200
-    assert service.calls == [
-        (
-            "App 生命周期是什么？",
-            4,
-            [
-                {"role": "user", "content": "u2"},
-                {"role": "assistant", "content": "a2"},
-                {"role": "user", "content": "u3"},
-                {"role": "assistant", "content": "a3"},
-                {"role": "user", "content": "u4"},
-                {"role": "assistant", "content": "a4"},
-                {"role": "user", "content": "u5"},
-                {"role": "assistant", "content": "a5"},
-            ],
-        )
-    ]
-
-
-def test_post_qa_stream_returns_sse_events_and_persists_final_answer(tmp_path: Path) -> None:
-    client, store = _create_client(tmp_path)
-    service = client.app.state.stub_service
-    conversation = store.create_conversation(user_id="user-a")
-    store.add_message(
-        user_id="user-a",
-        conversation_id=conversation.id,
-        role="user",
-        content="先介绍 App",
         status="done",
     )
 
@@ -298,17 +181,75 @@ def test_post_qa_stream_returns_sse_events_and_persists_final_answer(tmp_path: P
     assert "server_rerank_ms" in response.text
     assert "server_prompt_build_ms" in response.text
     assert service.stream_calls == [
-        ("App 生命周期是什么？", 4, [{"role": "user", "content": "先介绍 App"}])
+        (
+            "App 生命周期是什么？",
+            4,
+            [
+                {"role": "user", "content": "先介绍 App"},
+                {"role": "assistant", "content": "App 是小程序入口。"},
+            ],
+        )
     ]
 
     stored_messages = client.get(
         f"/conversations/{conversation.id}/messages",
         params={"user_id": "user-a"},
     ).json()
+    assert [item["role"] for item in stored_messages] == ["user", "assistant", "user", "assistant"]
     assert stored_messages[-1]["content"] == "answer"
     assert stored_messages[-1]["status"] == "done"
     assert stored_messages[-1]["model"] == "llama3.1:8b"
     assert stored_messages[-1]["retrieval_count"] == 1
+
+
+def test_post_qa_stream_only_loads_recent_history_window(tmp_path: Path) -> None:
+    client, store = _create_client(tmp_path)
+    service = client.app.state.stub_service
+    conversation = store.create_conversation(user_id="user-a")
+
+    for index in range(1, 6):
+        store.add_message(
+            user_id="user-a",
+            conversation_id=conversation.id,
+            role="user",
+            content=f"u{index}",
+            status="done",
+        )
+        store.add_message(
+            user_id="user-a",
+            conversation_id=conversation.id,
+            role="assistant",
+            content=f"a{index}",
+            status="done",
+        )
+
+    response = client.post(
+        "/qa/stream",
+        json={
+            "user_id": "user-a",
+            "conversation_id": conversation.id,
+            "question": "App 生命周期是什么？",
+            "top_k": 4,
+        },
+    )
+
+    assert response.status_code == 200
+    assert service.stream_calls == [
+        (
+            "App 生命周期是什么？",
+            4,
+            [
+                {"role": "user", "content": "u2"},
+                {"role": "assistant", "content": "a2"},
+                {"role": "user", "content": "u3"},
+                {"role": "assistant", "content": "a3"},
+                {"role": "user", "content": "u4"},
+                {"role": "assistant", "content": "a4"},
+                {"role": "user", "content": "u5"},
+                {"role": "assistant", "content": "a5"},
+            ],
+        )
+    ]
 
 
 def test_post_qa_stream_only_updates_store_once_after_stream_completion(tmp_path: Path) -> None:

@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
 from collections.abc import Iterator
+from dataclasses import dataclass
 
 from llm.config import Settings, load_settings
-from llm.generator import OllamaGenerator
-from llm.models import AnswerResult, ConversationTurn, RetrievalMetrics, RetrievedChunk
+from llm.generator import DeepSeekGenerator, Generator, OllamaGenerator
+from llm.models import ConversationTurn, RetrievalMetrics, RetrievedChunk
 from llm.prompting import build_prompt
 from llm.retrieval import Retriever
 
@@ -27,7 +27,7 @@ class QAService:
     def __init__(
         self,
         retriever: Retriever,
-        generator: OllamaGenerator,
+        generator: Generator,
         max_context_chars: int,
     ) -> None:
         self._retriever = retriever
@@ -37,37 +37,14 @@ class QAService:
     def warm_up(self) -> None:
         self._retriever.warm_up()
 
-    def answer_question(
-        self, question: str, top_k: int, history: list[ConversationTurn] | None = None
-    ) -> AnswerResult:
-        prepared = self._prepare_answer(
-            question=question,
-            top_k=top_k,
-            history=history,
-        )
-
-        if not prepared.chunks:
-            return AnswerResult(
-                question=prepared.question,
-                answer=EMPTY_RESULT_ANSWER,
-                citations=[],
-                model=self._generator.model,
-                retrieval_count=0,
-            )
-
-        answer = self._generator.generate(prepared.prompt)
-
-        return AnswerResult(
-            question=prepared.question,
-            answer=answer,
-            citations=prepared.chunks,
-            model=self._generator.model,
-            retrieval_count=len(prepared.chunks),
-        )
-
     def stream_answer_question(
-        self, question: str, top_k: int, history: list[ConversationTurn] | None = None
+        self,
+        question: str,
+        top_k: int,
+        history: list[ConversationTurn] | None = None,
+        generator: Generator | None = None,
     ) -> Iterator[dict[str, object]]:
+        _generator = generator or self._generator
         start_time = time.perf_counter()
         prepared = self._prepare_answer(
             question=question,
@@ -77,7 +54,7 @@ class QAService:
         retrieval_count = len(prepared.chunks)
         meta = {
             "question": prepared.question,
-            "model": self._generator.model,
+            "model": _generator.model,
             "retrieval_count": retrieval_count,
             "server_started_at_ms": 0.0,
             "retrieval_finished_at_ms": _elapsed_ms(start_time),
@@ -111,7 +88,7 @@ class QAService:
 
         full_answer = ""
         first_token_reported = False
-        for chunk in self._generator.generate_stream(prepared.prompt):
+        for chunk in _generator.generate_stream(prepared.prompt):
             full_answer += chunk
             data: dict[str, object] = {"text": chunk}
             if not first_token_reported:
@@ -186,11 +163,23 @@ def build_service(settings: Settings | None = None) -> QAService:
         rerank_candidate_limit=current.rerank_candidate_limit,
         disable_reranker=current.disable_reranker,
     )
-    generator = OllamaGenerator(
-        host=current.ollama_host,
-        model=current.generation_model,
-        timeout=current.request_timeout,
-    )
+    if current.generation_provider == "deepseek":
+        if not current.deepseek_api_key:
+            raise ValueError(
+                "LLM_DEEPSEEK_API_KEY is required when generation_provider is 'deepseek'"
+            )
+        generator = DeepSeekGenerator(
+            api_key=current.deepseek_api_key,
+            model=current.deepseek_model,
+            api_base=current.deepseek_api_base,
+            timeout=current.request_timeout,
+        )
+    else:
+        generator = OllamaGenerator(
+            host=current.ollama_host,
+            model=current.generation_model,
+            timeout=current.request_timeout,
+        )
     return QAService(
         retriever=retriever,
         generator=generator,
@@ -198,10 +187,14 @@ def build_service(settings: Settings | None = None) -> QAService:
     )
 
 
-def answer_question(question: str, top_k: int | None = None, settings: Settings | None = None) -> AnswerResult:
+def stream_answer_question(
+    question: str,
+    top_k: int | None = None,
+    settings: Settings | None = None,
+) -> Iterator[dict[str, object]]:
     current = settings or load_settings()
     service = build_service(current)
-    return service.answer_question(question=question, top_k=top_k or current.top_k)
+    return service.stream_answer_question(question=question, top_k=top_k or current.top_k)
 
 
 def _elapsed_ms(start_time: float) -> float:

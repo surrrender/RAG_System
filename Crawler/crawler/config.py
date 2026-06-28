@@ -48,7 +48,6 @@ class CrawlConfig:
     headless: bool = True
     max_concurrency: int = 4
     timeout_ms: int = 15_000
-    include_code: bool = True
     retries: int = 3
     base_delay_seconds: float = 1.0
     framework_url: str = FRAMEWORK_URL

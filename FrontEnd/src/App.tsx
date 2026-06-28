@@ -10,6 +10,7 @@ import {
 } from "./api/client";
 import ConversationSidebar from "./components/ConversationSidebar";
 import ChatMessageList from "./components/ChatMessageList";
+import PerformancePanel from "./components/PerformancePanel";
 import QuestionForm from "./components/QuestionForm";
 import StatusBanner from "./components/StatusBanner";
 import type {
@@ -24,7 +25,7 @@ import { buildPerformanceAggregate, computeDelta, computeServerDelta, roundMs } 
 
 
 const defaultQuestion = "小程序 App 生命周期是什么？";
-const defaultTopK = 3;
+const defaultTopK = 5;
 const scrollTopOffset = 28;
 const localUserIdStorageKey = "rag-system:user-id";
 const streamFlushIntervalMs = 40;
@@ -66,7 +67,6 @@ interface BufferedAssistantDelta {
 
 export default function App() {
   const [question, setQuestion] = useState(defaultQuestion);
-  const [topK, setTopK] = useState(defaultTopK);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
@@ -98,10 +98,6 @@ export default function App() {
     () => conversations.find((item) => item.id === activeConversationId) ?? null,
     [activeConversationId, conversations],
   );
-
-  useEffect(() => {
-    void bootstrapConversations();
-  }, []);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -211,6 +207,10 @@ export default function App() {
   );
 
   useEffect(() => {
+    void bootstrapConversations();
+  }, []);
+
+  useEffect(() => {
     window.__qaMetrics__ = {
       benchmarkMode,
       latestSample: latestPerformanceSample,
@@ -218,16 +218,6 @@ export default function App() {
       aggregate: performanceAggregate,
     };
   }, [benchmarkMode, latestPerformanceSample, performanceAggregate, performanceSamples]);
-
-  const handleTopKChange = (value: number) => {
-    if (Number.isNaN(value)) {
-      setTopK(defaultTopK);
-      return;
-    }
-
-    const clamped = Math.max(1, Math.min(20, Math.trunc(value)));
-    setTopK(clamped);
-  };
 
   const handleSubmit = async () => {
     const normalizedQuestion = question.trim();
@@ -276,7 +266,7 @@ export default function App() {
           user_id: userIdRef.current,
           conversation_id: activeConversationId,
           question: normalizedQuestion,
-          top_k: topK,
+          top_k: defaultTopK,
         },
         {
           onResponseStarted: () => {
@@ -449,6 +439,11 @@ export default function App() {
                 title={activeConversation?.title ?? "新会话"}
                 userId={userIdRef.current}
               />
+              {/* <PerformancePanel
+                latestSample={latestPerformanceSample}
+                aggregate={performanceAggregate}
+                benchmarkMode={benchmarkMode}
+              /> */}
               {/* {roundCount > 0 ? (
                 <p className="chat-footnote">
                   当前会话 {roundCount} 轮，模型回复会实时流式写入，并在消息内折叠展示引用来源。
@@ -458,7 +453,6 @@ export default function App() {
             <div className="composer-dock" ref={composerDockRef}>
               <QuestionForm
                 question={question}
-                topK={topK}
                 loading={loading || bootstrapping || !activeConversationId}
                 validationError={validationError}
                 onStop={handleStop}
@@ -467,10 +461,8 @@ export default function App() {
                   if (value.trim()) {
                     setValidationError(null);
                   }
-                }}
-                onTopKChange={handleTopKChange}
-                onSubmit={handleSubmit}
-              />
+                } }
+                onSubmit={handleSubmit} />
             </div>
           </div>
         </div>

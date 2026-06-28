@@ -3,24 +3,20 @@ import { FormEvent, KeyboardEvent, useLayoutEffect, useRef } from "react";
 
 interface QuestionFormProps {
   question: string;
-  topK: number;
   loading: boolean;
   validationError: string | null;
   onStop: () => void;
   onQuestionChange: (value: string) => void;
-  onTopKChange: (value: number) => void;
   onSubmit: () => void;
 }
 
 
 export default function QuestionForm({
   question,
-  topK,
   loading,
   validationError,
   onStop,
   onQuestionChange,
-  onTopKChange,
   onSubmit,
 }: QuestionFormProps) {
   const canSubmit = !loading;
@@ -77,18 +73,6 @@ export default function QuestionForm({
           disabled={loading}
         />
         <div className="composer-footer">
-          <label className="composer-topk">
-            <span>Top K</span>
-            <input
-              type="number"
-              min={1}
-              max={20}
-              step={1}
-              value={topK}
-              onChange={(event) => onTopKChange(Number(event.target.value))}
-              disabled={loading}
-            />
-          </label>
           {loading ? (
             <button type="button" className="submit-button composer-button stop-button" onClick={onStop}>
               暂停

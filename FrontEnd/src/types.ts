@@ -37,15 +37,6 @@ export interface StoredMessage {
 }
 
 
-export interface QAResponse {
-  question: string;
-  answer: string;
-  citations: Citation[];
-  model: string;
-  retrieval_count: number;
-}
-
-
 export interface QARequest {
   user_id: string;
   conversation_id: string;

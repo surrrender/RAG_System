@@ -47,11 +47,12 @@ class Retriever:
         _, _, _, search_chunks = load_embedding_indexing_symbols()
         stage_metrics: dict[str, float] = {}
         enable_reranker = reranker is not None and not self.disable_reranker
+        fetch_limit = max(top_k, self.rerank_candidate_limit if enable_reranker else top_k)
         results = search_chunks(
             index=index,
             embedder=embedder,
             query=question,
-            limit=top_k,
+            limit=fetch_limit,
             reranker=reranker,
             enable_reranker=enable_reranker,
             rerank_candidate_limit=self.rerank_candidate_limit,
@@ -68,12 +69,22 @@ class Retriever:
             )
             for item in results
         ]
+        chunks.sort(key=lambda item: item.score, reverse=True)
+        seen: dict[str, bool] = {}
+        deduped: list[RetrievedChunk] = []
+        for c in chunks:
+            if c.text is not None and c.text not in seen:
+                seen[c.text] = True
+                deduped.append(c)
+            elif c.text is None:
+                deduped.append(c)
+        chunks = deduped[:top_k]
         metrics = RetrievalMetrics(
             embed_ms=stage_metrics.get("embed_ms"),
             vector_search_ms=stage_metrics.get("vector_search_ms"),
             rerank_ms=stage_metrics.get("rerank_ms"),
         )
-        return sorted(chunks, key=lambda item: item.score, reverse=True), metrics
+        return chunks, metrics
 
     def _get_embedder(self) -> object:
         if self._embedder is None:

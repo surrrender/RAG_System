@@ -1,86 +1,141 @@
 from __future__ import annotations
 
+import re
+
 from crawler.models import ChunkRecord, PageRecord
 from crawler.utils import estimate_tokens, make_chunk_id
 
 
-def build_chunks(page: PageRecord, heading_blocks: list[dict[str, object]], min_chars: int = 80) -> list[ChunkRecord]:
+_SEMANTIC_SPLIT_PATTERNS = (
+    re.compile(r"\n{2,}"),
+    re.compile(r"\n+"),
+    re.compile(r"[。！？!?；;]+(?:[\"'”’」』】》）]+)?"),
+    re.compile(r"[，、,:：]+(?:[\"'”’」』】》）]+)?"),
+    re.compile(r"\s+"),
+)
+
+
+def build_chunks(
+    page: PageRecord,
+    heading_blocks: list[dict[str, object]],
+    max_chars: int = 500,
+) -> list[ChunkRecord]:
     chunks: list[ChunkRecord] = []
     for block in heading_blocks:
         text = str(block["text"]).strip()
-        codes = [str(item) for item in block["code_blocks"]]
         section_path = [str(item).lstrip('#') for item in block["section_path"]]
-        if not text and not codes:
+        if len(text) < 10:
             continue
 
-        text_chunk = _build_text_chunk(page=page, section_path=section_path, text=text) if text else None
-        if text_chunk is not None and chunks and len(text) < min_chars and chunks[-1].chunk_type == "text":
-            previous = chunks[-1]
-            previous.chunk_text = f"{previous.chunk_text}\n\n{text}".strip()
-            previous.token_estimate = estimate_tokens(previous.chunk_text)
-            text_chunk = previous
-        elif text_chunk is not None:
-            chunks.append(text_chunk)
-
-        code_chunks = _build_code_chunks(page=page, section_path=section_path, codes=codes, text_chunk=text_chunk)
-        if text_chunk is not None:
-            text_chunk.related_code_ids.extend(chunk.chunk_id for chunk in code_chunks)
-        chunks.extend(code_chunks)
+        for split_text in _split_text_semantically(text, max_chars=max_chars):
+            chunk = _build_chunk(page=page, section_path=section_path, text=split_text)
+            if chunk is not None:
+                chunks.append(chunk)
 
     if not chunks:
-        fallback_text_chunk = _build_text_chunk(page=page, section_path=[], text=page.raw_text)
-        assert fallback_text_chunk is not None
-        fallback_code_chunks = _build_code_chunks(
-            page=page,
-            section_path=[],
-            codes=page.code_blocks,
-            text_chunk=fallback_text_chunk,
-        )
-        fallback_text_chunk.related_code_ids.extend(chunk.chunk_id for chunk in fallback_code_chunks)
-        chunks.append(fallback_text_chunk)
-        chunks.extend(fallback_code_chunks)
-    return chunks
-
-#TODO:这样其实也不完美,因为在第一步就已经将文本和代码完全切分开了,更合适的方案应该是将文本和代码编织在一起
-def build_chunks_with_codes_and_text_together(page: PageRecord, heading_blocks: list[dict[str, object]], min_chars: int = 80) -> list[ChunkRecord]:
-    chunks: list[ChunkRecord] = []
-    for block in heading_blocks:
-        text = str(block["text"]).strip()
-        codes = [str(item) for item in block["code_blocks"]]
-        section_path = [str(item).lstrip('#') for item in block["section_path"]]
-        if not text and not codes:
-            continue
-
-        text_chunk = _build_text_chunk(page=page, section_path=section_path, text=text) if text else None
-        if text_chunk is not None and chunks and len(text) < min_chars and chunks[-1].chunk_type == "text":
-            previous = chunks[-1]
-            previous.chunk_text = f"{previous.chunk_text}\n\n{text}".strip()
-            previous.token_estimate = estimate_tokens(previous.chunk_text)
-            text_chunk = previous
-        elif text_chunk is not None:
-            chunks.append(text_chunk)
-
-        code_chunks = _build_code_chunks(page=page, section_path=section_path, codes=codes, text_chunk=text_chunk)
-        if text_chunk is not None:
-            text_chunk.related_code_ids.extend(chunk.chunk_id for chunk in code_chunks)
-        chunks.extend(code_chunks)
-
-    if not chunks:
-        fallback_text_chunk = _build_text_chunk(page=page, section_path=[], text=page.raw_text)
-        assert fallback_text_chunk is not None
-        fallback_code_chunks = _build_code_chunks(
-            page=page,
-            section_path=[],
-            codes=page.code_blocks,
-            text_chunk=fallback_text_chunk,
-        )
-        fallback_text_chunk.related_code_ids.extend(chunk.chunk_id for chunk in fallback_code_chunks)
-        chunks.append(fallback_text_chunk)
-        chunks.extend(fallback_code_chunks)
+        for split_text in _split_text_semantically(page.raw_text, max_chars=max_chars):
+            chunk = _build_chunk(page=page, section_path=[], text=split_text)
+            if chunk is not None:
+                chunks.append(chunk)
     return chunks
 
 
-def _build_text_chunk(page: PageRecord, section_path: list[str], text: str) -> ChunkRecord | None:
+def _split_text_semantically(text: str, max_chars: int) -> list[str]:
+    body = text.strip()
+    if not body:
+        return []
+    if len(body) <= max_chars:
+        return [body]
+    return _split_text_recursively(body, max_chars=max_chars, patterns=_SEMANTIC_SPLIT_PATTERNS)
+
+
+def _split_text_recursively(text: str, max_chars: int, patterns: tuple[re.Pattern[str], ...]) -> list[str]:
+    body = text.strip()
+    if len(body) <= max_chars:
+        return [body]
+    if not patterns:
+        return _hard_split_text(body, max_chars=max_chars)
+
+    pattern = patterns[0]
+    remaining_patterns = patterns[1:]
+    segments = _split_by_pattern(body, pattern)
+    if len(segments) == 1:
+        return _split_text_recursively(body, max_chars=max_chars, patterns=remaining_patterns)
+
+    chunks: list[str] = []
+    current = ""
+    for segment in segments:
+        candidate = f"{current}{segment}"
+        if current and len(candidate.strip()) > max_chars:
+            chunks.extend(
+                _finalize_or_split_chunk(
+                    current,
+                    max_chars=max_chars,
+                    patterns=remaining_patterns,
+                )
+            )
+            current = segment
+            continue
+        current = candidate
+
+    if current.strip():
+        chunks.extend(
+            _finalize_or_split_chunk(
+                current,
+                max_chars=max_chars,
+                patterns=remaining_patterns,
+            )
+        )
+    return chunks
+
+
+def _finalize_or_split_chunk(text: str, max_chars: int, patterns: tuple[re.Pattern[str], ...]) -> list[str]:
+    body = text.strip()
+    if not body:
+        return []
+    if len(body) <= max_chars:
+        return [body]
+    return _split_text_recursively(body, max_chars=max_chars, patterns=patterns)
+
+
+def _split_by_pattern(text: str, pattern: re.Pattern[str]) -> list[str]:
+    segments: list[str] = []
+    start = 0
+    for match in pattern.finditer(text):
+        end = match.end()
+        segment = text[start:end]
+        if segment.strip():
+            segments.append(segment)
+        start = end
+
+    tail = text[start:]
+    if tail.strip():
+        segments.append(tail)
+    return segments
+
+
+def _hard_split_text(text: str, max_chars: int) -> list[str]:
+    chunks: list[str] = []
+    remaining = text.strip()
+    while len(remaining) > max_chars:
+        split_at = remaining.rfind(" ", 0, max_chars + 1)
+        if split_at <= 0:
+            split_at = max_chars
+
+        chunk = remaining[:split_at].strip()
+        if not chunk:
+            split_at = max_chars
+            chunk = remaining[:split_at].strip()
+
+        chunks.append(chunk)
+        remaining = remaining[split_at:].strip()
+
+    if remaining:
+        chunks.append(remaining)
+    return chunks
+
+
+def _build_chunk(page: PageRecord, section_path: list[str], text: str) -> ChunkRecord | None:
     body = text.strip()
     if not body:
         return None
@@ -91,48 +146,7 @@ def _build_text_chunk(page: PageRecord, section_path: list[str], text: str) -> C
         title=page.title,
         nav_path=page.nav_path,
         section_path=section_path,
-        chunk_type="text",
         chunk_text=body,
-        related_code_ids=[],
-        related_text_ids=[],
         token_estimate=estimate_tokens(body),
         fetched_at=page.fetched_at,
     )
-
-
-def _build_code_chunks(
-    page: PageRecord,
-    section_path: list[str],
-    codes: list[str],
-    text_chunk: ChunkRecord | None,
-) -> list[ChunkRecord]:
-    code_chunks: list[ChunkRecord] = []
-    related_text_ids = [text_chunk.chunk_id] if text_chunk is not None else []
-    for index, code in enumerate(codes, start=1):
-        body = code.strip()
-
-        if not body:
-            continue
-        code_chunks.append(
-            ChunkRecord(
-                chunk_id=make_chunk_id(
-                    page.doc_id,
-                    section_path,
-                    body,
-                    chunk_type="code",
-                    salt=f"code-{index}",
-                ),
-                doc_id=page.doc_id,
-                url=page.url,
-                title=page.title,
-                nav_path=page.nav_path,
-                section_path=section_path,
-                chunk_type="code",
-                chunk_text=body,
-                related_code_ids=[],
-                related_text_ids=related_text_ids.copy(),
-                token_estimate=estimate_tokens(body),
-                fetched_at=page.fetched_at,
-            )
-        )
-    return code_chunks

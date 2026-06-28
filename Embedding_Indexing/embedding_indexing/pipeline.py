@@ -111,7 +111,7 @@ def search_chunks(
     if stage_metrics is not None:
         stage_metrics["vector_search_ms"] = _elapsed_ms(vector_search_started_at)
 
-    if not enable_reranker or len(points) <= limit:
+    if not enable_reranker:
         return [_point_to_result(point) for point in points[:limit]]
 
     rerank_started_at = time.perf_counter()
@@ -124,14 +124,12 @@ def search_chunks(
 def build_default_embedder(
     provider: str,
     model_name: str,
-    hash_dimension: int = 32,
     offline: bool = False,
     device: str = "cpu",
 ) -> BaseEmbedder:
     return build_embedder(
         provider=provider,
         model_name=model_name,
-        hash_dimension=hash_dimension,
         offline=offline,
         device=device,
     )

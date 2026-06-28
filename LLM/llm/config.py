@@ -17,7 +17,7 @@ DEFAULT_RERANKER_PROVIDER = "cross-encoder"
 DEFAULT_RERANKER_MODEL = "BAAI/bge-reranker-base"
 DEFAULT_RERANKER_DEVICE = "cpu"
 DEFAULT_RERANK_CANDIDATE_LIMIT = 10
-DEFAULT_TOP_K = 5
+DEFAULT_TOP_K = 10
 DEFAULT_MAX_CONTEXT_CHARS = 5000
 DEFAULT_OLLAMA_HOST = "http://127.0.0.1:11434"
 # DEFAULT_GENERATION_MODEL = "qwen2.5:7b"
@@ -26,6 +26,9 @@ DEFAULT_GENERATION_MODEL = "qwen3:8b"
 DEFAULT_HTTP_HOST = "127.0.0.1"
 DEFAULT_HTTP_PORT = 8000
 DEFAULT_REQUEST_TIMEOUT = 60.0
+DEFAULT_GENERATION_PROVIDER = "ollama"
+DEFAULT_DEEPSEEK_API_BASE = "https://api.deepseek.com"
+DEFAULT_DEEPSEEK_MODEL = "deepseek-chat"
 
 
 def _env_int(name: str, default: int) -> int:
@@ -70,6 +73,10 @@ class Settings:
     http_host: str = os.getenv("LLM_HTTP_HOST", DEFAULT_HTTP_HOST)
     http_port: int = _env_int("LLM_HTTP_PORT", DEFAULT_HTTP_PORT)
     request_timeout: float = _env_float("LLM_REQUEST_TIMEOUT", DEFAULT_REQUEST_TIMEOUT)
+    generation_provider: str = os.getenv("LLM_GENERATION_PROVIDER", DEFAULT_GENERATION_PROVIDER)
+    deepseek_api_key: str | None = os.getenv("LLM_DEEPSEEK_API_KEY")
+    deepseek_api_base: str = os.getenv("LLM_DEEPSEEK_API_BASE", DEFAULT_DEEPSEEK_API_BASE)
+    deepseek_model: str = os.getenv("LLM_DEEPSEEK_MODEL", DEFAULT_DEEPSEEK_MODEL)
     sqlite_path: Path = Path(os.getenv("LLM_SQLITE_PATH", DEFAULT_SQLITE_PATH))
 
 

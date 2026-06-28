@@ -39,24 +39,6 @@ class Citation:
 
 
 @dataclass(slots=True)
-class AnswerResult:
-    question: str
-    answer: str
-    citations: list[Citation]
-    model: str
-    retrieval_count: int
-
-    def to_dict(self) -> dict[str, object]:
-        return {
-            "question": self.question,
-            "answer": self.answer,
-            "citations": [item.to_dict() for item in self.citations],
-            "model": self.model,
-            "retrieval_count": self.retrieval_count,
-        }
-
-
-@dataclass(slots=True)
 class RetrievalMetrics:
     embed_ms: float | None = None
     vector_search_ms: float | None = None

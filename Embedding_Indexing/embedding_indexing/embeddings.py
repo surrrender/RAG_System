@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-import hashlib
-import math
 import os
 from abc import ABC, abstractmethod
-from typing import Iterable
 
 from embedding_indexing.models import ChunkRecord
 
@@ -39,7 +36,6 @@ class SentenceTransformerEmbedder(BaseEmbedder):
 
         self._model = SentenceTransformer(
             model_name,
-            trust_remote_code=True,
             local_files_only=offline,
             device=device,
         )
@@ -56,38 +52,6 @@ class SentenceTransformerEmbedder(BaseEmbedder):
         return [list(map(float, vector)) for vector in vectors]
 
 
-class HashEmbedder(BaseEmbedder):
-    def __init__(self, dimension: int = 64) -> None:
-        self._dimension = dimension
-
-    @property
-    def dimension(self) -> int:
-        return self._dimension
-
-    def embed_texts(self, texts: list[str]) -> list[list[float]]:
-        return [self._embed_single(text) for text in texts]
-
-    def _embed_single(self, text: str) -> list[float]:
-        values = [0.0] * self._dimension
-        for token in _tokenize(text):
-            digest = hashlib.sha256(token.encode("utf-8")).digest()
-            slot = int.from_bytes(digest[:2], "big") % self._dimension
-            sign = 1.0 if digest[2] % 2 == 0 else -1.0
-            values[slot] += sign
-
-        norm = math.sqrt(sum(item * item for item in values))
-        if norm > 0:
-            return [item / norm for item in values]
-        return values
-
-
-def _tokenize(text: str) -> Iterable[str]:
-    for token in text.split():
-        token = token.strip()
-        if token:
-            yield token
-
-
 def chunk_to_embedding_text(chunk: ChunkRecord) -> str:
     parts = [
         chunk.title.strip(),
@@ -101,15 +65,13 @@ def _format_chunk_path(nav_path: list[str], section_path: list[str]) -> str:
     full_path = [item.strip() for item in [*nav_path, *section_path] if str(item).strip()]
     return " > ".join(full_path)
 
+
 def build_embedder(
     provider: str,
     model_name: str,
-    hash_dimension: int = 32,
     offline: bool = False,
     device: str = "cpu",
 ) -> BaseEmbedder:
     if provider == "sentence-transformer":
         return SentenceTransformerEmbedder(model_name, offline=offline, device=device)
-    if provider == "hash":
-        return HashEmbedder(dimension=hash_dimension)
     raise ValueError(f"Unsupported embedder provider: {provider}")

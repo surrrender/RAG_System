@@ -18,7 +18,6 @@
 - 同一个 `chunk_id` 会映射到同一个 point id，因此重复导入时会稳定 upsert
 - 提供本地检索命令，便于快速验证召回结果
 - `search` 默认执行 dense 召回后再用 Cross-Encoder reranker 重排
-- 提供一个测试用 `hash` embedder，方便在未下载真实模型时做基础联调
 
 ## 目录结构
 
@@ -55,12 +54,6 @@ source .venv/bin/activate
 
 ```bash
 python -m pip install -e '.[dev]'
-```
-
-如果你只想先验证命令和流程，不想立即下载大模型，可以先使用测试 embedder：
-
-```bash
-python -m embedding_indexing index --embedder-provider hash --model-name ignored
 ```
 
 说明：
@@ -117,7 +110,6 @@ python -m embedding_indexing index ^
   --qdrant-path .\data\qdrant ^
   --collection-name wechat_framework_chunks ^
   --model-name BAAI/bge-m3 ^
-  --embedder-provider sentence-transformer ^
   --batch-size 8 ^
   --device cpu ^
   --recreate
@@ -129,11 +121,10 @@ python -m embedding_indexing index ^
 - `--qdrant-path`: 本地 Qdrant 数据目录
 - `--collection-name`: 目标 collection 名称
 - `--model-name`: embedding 模型名
-- `--embedder-provider`: 当前支持 `sentence-transformer` 和 `hash`
+- `--embedder-provider`: 当前支持 `sentence-transformer`
 - `--batch-size`: 批量写入和编码大小
 - `--device`: embedding 设备，支持 `cpu`、`mps`、`cuda`、`auto`
 - `--recreate`: 删除并重建 collection
-- `--hash-dimension`: 仅 `hash` embedder 使用
 - `--offline`: 仅从本地缓存加载模型；适合模型已下载完成后的离线检索
 
 运行成功后会输出类似：
@@ -144,7 +135,7 @@ indexed 456 chunks into wechat_framework_chunks (dim=1024) at D:\...\Embedding_I
 
 注意：
 
-- 如果你之前用 `hash` embedder 或旧的 embedding 模型建过索引，再切换到 `BAAI/bge-m3` 时，必须使用 `--recreate`
+- 如果你之前用旧的 embedding 模型建过索引，再切换到 `BAAI/bge-m3` 时，必须使用 `--recreate`
 - 或者改用新的 `--qdrant-path` / `--collection-name`
 - 原因是旧集合的向量维度很可能与当前默认模型不同，不能混用
 
@@ -161,7 +152,6 @@ python -m embedding_indexing search "Page onLoad 是什么时候触发的" ^
   --qdrant-path .\data\qdrant ^
   --collection-name wechat_framework_chunks ^
   --model-name BAAI/bge-m3 ^
-  --embedder-provider sentence-transformer ^
   --reranker-model-name BAAI/bge-reranker-base ^
   --rerank-candidate-limit 10 ^
   --limit 3
@@ -224,7 +214,7 @@ python -m pytest -o cache_dir=state/.pytest_cache
 当前测试包括：
 
 - JSONL chunk 读取
-- 基于测试 embedder 的基础索引/检索流程
+- 基于测试 stub embedder 的基础索引/检索流程
 - search CLI 的 reranker 默认开启与显式关闭行为
 
 说明：
@@ -238,7 +228,7 @@ python -m pytest -o cache_dir=state/.pytest_cache
 - 当前没有实现“只重建变更 chunk”的增量索引逻辑
 - 首次使用 `BAAI/bge-m3` 或 `BAAI/bge-reranker-base` 会下载模型，耗时取决于网络、磁盘和可用内存
 - 在 Apple Silicon 上如果使用 `mps` 容易遇到显存不足；建议优先使用默认的 `--device cpu`
-- 如果已有旧的 hash 索引或旧 embedding 模型索引，切换到当前默认模型可能会报维度不匹配；需要 `--recreate` 或换新的索引目录/集合
+- 如果已有旧 embedding 模型索引，切换到当前默认模型可能会报维度不匹配；需要 `--recreate` 或换新的索引目录/集合
 - `search` 现在会先检查 collection 维度是否和当前模型一致，不一致时会直接给出明确错误
 - 检索接口当前直接对整个集合召回并重排，还没有按 `doc_id` 做聚合或去重
 

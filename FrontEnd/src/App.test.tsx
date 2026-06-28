@@ -330,9 +330,12 @@ describe("App", () => {
 
     await screen.findByText("这是第二个会话的历史回答。");
 
+    const moreActionButtons = screen.getAllByRole("button", { name: "更多操作" });
+    await user.click(moreActionButtons[1]);
     await user.click(screen.getByRole("button", { name: "重命名会话 历史会话" }));
     expect(mockedRenameConversation).toHaveBeenCalledWith(expect.any(String), "conversation-2", "重命名后的会话");
 
+    await user.click(moreActionButtons[1]);
     await user.click(screen.getByRole("button", { name: "删除会话 历史会话" }));
     expect(mockedDeleteConversation).toHaveBeenCalledWith(expect.any(String), "conversation-2");
   });

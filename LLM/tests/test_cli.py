@@ -4,38 +4,48 @@ from types import SimpleNamespace
 from typer.testing import CliRunner
 
 from llm.cli import app
-from llm.models import AnswerResult, RetrievedChunk
 
 
 runner = CliRunner()
 
 
-def test_ask_command_outputs_answer_and_citations(monkeypatch) -> None:
-    def fake_answer_question(question: str, top_k: int | None = None) -> AnswerResult:
-        assert question == "App 生命周期是什么？"
-        assert top_k == 3
-        return AnswerResult(
-            question=question,
-            answer="这是答案",
-            citations=[
-                RetrievedChunk(
-                    chunk_id="chunk-1",
-                    score=0.9,
-                    title="App",
-                    url="https://example.com/app",
-                    section_path=["生命周期"],
-                    text="App onLaunch",
-                )
-            ],
-            model="llama3.1:8b",
-            retrieval_count=1,
-        )
+class StubService:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, int]] = []
 
-    monkeypatch.setattr("llm.cli.answer_question", fake_answer_question)
+    def stream_answer_question(self, question: str, top_k: int) -> list[dict[str, object]]:
+        self.calls.append((question, top_k))
+        return [
+            {"event": "meta", "data": {"model": "llama3.1:8b", "retrieval_count": 1}},
+            {"event": "delta", "data": {"text": "这是"}},
+            {"event": "delta", "data": {"text": "答案"}},
+            {
+                "event": "citations",
+                "data": {
+                    "citations": [
+                        {
+                            "chunk_id": "chunk-1",
+                            "score": 0.9,
+                            "title": "App",
+                            "url": "https://example.com/app",
+                            "section_path": ["生命周期"],
+                            "text": "App onLaunch",
+                        }
+                    ]
+                },
+            },
+            {"event": "done", "data": {"answer": "这是答案"}},
+        ]
+
+
+def test_ask_command_streams_answer_and_citations(monkeypatch) -> None:
+    service = StubService()
+    monkeypatch.setattr("llm.cli.build_service", lambda settings: service)
 
     result = runner.invoke(app, ["ask", "App 生命周期是什么？", "--top-k", "3"])
 
     assert result.exit_code == 0
+    assert service.calls == [("App 生命周期是什么？", 3)]
     assert "这是答案" in result.output
     assert "Citations:" in result.output
 

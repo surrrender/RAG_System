@@ -759,7 +759,7 @@ a {
 
 .composer-footer {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 16px;
   align-items: center;
 }

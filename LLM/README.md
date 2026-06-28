@@ -1,12 +1,19 @@
 # LLM RAG QA
 
-基于本地 `Ollama` 和现有 `Embedding_Indexing` Qdrant 索引的单轮问答模块。
+基于本地 `Ollama`（默认）或外部 `DeepSeek API` 和现有 `Embedding_Indexing` Qdrant 索引的单轮问答模块。
 
 默认会复用 `Embedding_Indexing` 的检索链路：
 
 - embedding 模型：`BAAI/bge-m3`
 - reranker 模型：`BAAI/bge-reranker-base`
 - 检索流程：`dense 召回 -> rerank 重排 -> 送入 LLM 生成`
+
+生成阶段支持两种 provider：
+
+| Provider | 说明 | 默认模型 |
+|----------|------|----------|
+| `ollama`（默认） | 本地推理，使用 Ollama | `qwen3:8b` |
+| `deepseek` | 外部 DeepSeek API | `deepseek-chat` |
 
 ## 安装
 
@@ -19,10 +26,21 @@ source .venv/bin/activate
 
 如果是首次运行，并且本地还没有缓存 embedding / reranker 模型，请先保证 `Embedding_Indexing` 侧模型已经下载完成。
 
+如需使用 DeepSeek API，额外安装：
+
+```bash
+pip install openai
+# 或 pip install llm-rag[deepseek]
+```
+
 ## CLI
 
 ```bash
+# 使用本地 Ollama（默认）
 python -m llm ask "小程序 App 生命周期是什么？"
+
+# 使用 DeepSeek API
+python -m llm ask "小程序 App 生命周期是什么？" --provider deepseek
 ```
 
 启动 HTTP API：
@@ -64,6 +82,17 @@ POST   /qa/stream
 }
 ```
 
+可按需传入 `generation_provider` 覆盖配置文件中的 provider（不传则使用配置默认值）：
+
+```json
+{
+  "user_id": "browser-local-user-id",
+  "conversation_id": "uuid",
+  "question": "...",
+  "generation_provider": "deepseek"
+}
+```
+
 会话与消息历史默认存储在本地 SQLite：
 
 ```bash
@@ -99,6 +128,20 @@ LLM_QDRANT_API_KEY=optional-api-key
 - `Qdrant local mode` 更适合开发和单实例测试。
 - 如果同一个本地索引目录会被多个客户端、多个进程或更高并发同时访问，建议改用 `Qdrant server mode`。
 - 现在如果检测到 local mode 目录锁冲突，错误信息会直接提示切换到 `LLM_QDRANT_URL`。
+
+## DeepSeek API 配置
+
+通过环境变量切换 provider 和配置 DeepSeek：
+
+```bash
+# 全局切换为 DeepSeek API
+export LLM_GENERATION_PROVIDER=deepseek
+export LLM_DEEPSEEK_API_KEY=sk-your-deepseek-api-key
+export LLM_DEEPSEEK_MODEL=deepseek-chat          # 可选, 默认 deepseek-chat
+export LLM_DEEPSEEK_API_BASE=https://api.deepseek.com  # 可选, 默认如上
+```
+
+也可以在 CLI 或 HTTP 请求中按次切换（见下方说明）。
 
 ## 并发压测
 

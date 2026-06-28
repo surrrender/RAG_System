@@ -7,14 +7,13 @@ import time
 from pathlib import Path
 
 from evaluation.generators.question_generator import load_questions
-from evaluation.evaluators.performance_evaluator import run_single_query_performance, run_concurrency_performance
+from evaluation.evaluators.performance_evaluator import run_single_query_performance
 from evaluation.strategies.bm25 import build_bm25_index
 from evaluation.strategies.hybrid import HybridRetriever
 from evaluation.strategies.comparator import StrategyComparator
 from evaluation.reporters.html_reporter_v3 import generate_full_report_v3
 from llm.config import load_settings
 from llm.retrieval import Retriever
-from llm.generator import OllamaGenerator
 from llm.service import build_service
 from embedding_indexing.io import iter_chunks
 
@@ -119,23 +118,12 @@ def main() -> None:
     service._retriever.disable_reranker = False
     service._retriever.rerank_candidate_limit = 15
 
-    performance_result = run_single_query_performance(service, questions, top_k=5)
+    perf_questions = questions[:10]
+    performance_result = run_single_query_performance(service, perf_questions, top_k=5)
     print(f"  Avg Total: {performance_result.avg_total_ms:.0f}ms")
     print(f"  P50: {performance_result.p50_total_ms:.0f}ms  P95: {performance_result.p95_total_ms:.0f}ms")
     print(f"  Avg Tokens: Prompt={performance_result.avg_prompt_tokens:.0f}, Completion={performance_result.avg_completion_tokens:.0f}")
     print(f"  Breakdown: Embed={performance_result.avg_embed_ms:.0f}ms Search={performance_result.avg_vector_search_ms:.0f}ms Rerank={performance_result.avg_rerank_ms:.0f}ms Gen={performance_result.avg_generation_ms:.0f}ms")
-
-    # Concurrency test
-    print("\n  Concurrency testing...")
-    conc_results = run_concurrency_performance(
-        service,
-        questions[:12],  # Use subset for concurrency to save time
-        concurrency_levels=[1, 2, 4],
-        top_k=5,
-    )
-    performance_result.concurrency_results = conc_results
-    for c in conc_results:
-        print(f"    conc={c['concurrency']}  QPS={c['qps']:.2f}  avg_lat={c['avg_latency_ms']:.0f}ms  p95_lat={c['p95_latency_ms']:.0f}ms")
 
     # Free Qdrant
     try:

@@ -17,7 +17,6 @@ def run(
     headless: bool = typer.Option(True, help="Run browser in headless mode."),
     max_concurrency: int = typer.Option(4, help="Maximum concurrent fetches."),
     timeout_ms: int = typer.Option(15_000, help="Per-page timeout in milliseconds."),
-    include_code: bool = typer.Option(True, help="Keep code blocks in outputs."),
 ) -> None:
     if mode not in {"full", "incremental"}:
         raise typer.BadParameter("mode must be 'full' or 'incremental'")
@@ -27,7 +26,6 @@ def run(
         headless=headless,
         max_concurrency=max_concurrency,
         timeout_ms=timeout_ms,
-        include_code=include_code,
     )
     summary = asyncio.run(run_crawl(config))
     typer.echo(

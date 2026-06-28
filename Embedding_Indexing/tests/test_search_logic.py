@@ -42,11 +42,12 @@ class RecordingReranker:
 
     def rerank(self, query: str, documents: list[str]) -> list[float]:
         self.calls.append((query, documents))
-        return [2.0, 1.0, 3.0]
+        return [float(len(documents) - i) for i in range(len(documents))]
 
 
-def test_search_chunks_skips_rerank_when_candidate_count_does_not_exceed_limit() -> None:
+def test_search_chunks_runs_rerank_when_enabled() -> None:
     stage_metrics: dict[str, float] = {}
+    reranker = RecordingReranker()
     index = FakeIndex(
         [
             FakePoint("chunk-1", 0.9, "doc-1"),
@@ -59,7 +60,7 @@ def test_search_chunks_skips_rerank_when_candidate_count_does_not_exceed_limit()
         embedder=FakeEmbedder(),
         query="app lifecycle",
         limit=2,
-        reranker=FailIfCalledReranker(),
+        reranker=reranker,
         enable_reranker=True,
         rerank_candidate_limit=5,
         stage_metrics=stage_metrics,
@@ -68,7 +69,7 @@ def test_search_chunks_skips_rerank_when_candidate_count_does_not_exceed_limit()
     assert [item["chunk_id"] for item in results] == ["chunk-1", "chunk-2"]
     assert "embed_ms" in stage_metrics
     assert "vector_search_ms" in stage_metrics
-    assert "rerank_ms" not in stage_metrics
+    assert "rerank_ms" in stage_metrics
 
 
 def test_search_chunks_records_rerank_timing_when_rerank_runs() -> None:
@@ -93,8 +94,10 @@ def test_search_chunks_records_rerank_timing_when_rerank_runs() -> None:
         stage_metrics=stage_metrics,
     )
 
-    assert [item["chunk_id"] for item in results] == ["chunk-3", "chunk-1"]
+    assert [item["chunk_id"] for item in results] == ["chunk-1", "chunk-2"]
     assert reranker.calls == [("app lifecycle", ["doc-1", "doc-2", "doc-3"])]
+    assert results[0]["score"] == 3.0
+    assert results[1]["score"] == 2.0
     assert "embed_ms" in stage_metrics
     assert "vector_search_ms" in stage_metrics
     assert "rerank_ms" in stage_metrics

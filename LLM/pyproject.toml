@@ -19,6 +19,9 @@ dependencies = [
 dev = [
   "pytest>=8.0.0",
 ]
+deepseek = [
+  "openai>=1.0.0",
+]
 
 [project.scripts]
 llm = "llm.cli:app"

@@ -28,7 +28,6 @@ class CrossEncoderReranker(BaseReranker):
         with _proxy_guard(enabled=offline):
             self._model = CrossEncoder(
                 model_name,
-                trust_remote_code=True,
                 local_files_only=offline,
                 device=device,
             )

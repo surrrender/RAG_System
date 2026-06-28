@@ -39,7 +39,6 @@ def index(
     embedder_provider: str = typer.Option("sentence-transformer"),
     batch_size: int = typer.Option(DEFAULT_BATCH_SIZE, min=1),
     recreate: bool = typer.Option(False, help="Delete and recreate the target collection before upsert."),
-    hash_dimension: int = typer.Option(64, min=4, help="Only used by the hash embedder."),
     offline: bool = typer.Option(False, help="Load embedding model from local cache only."),
     device: str = typer.Option("cpu", help="Embedding device: cpu, mps, cuda, or auto."),
 ) -> None:
@@ -48,7 +47,6 @@ def index(
     embedder = build_default_embedder(
         provider=embedder_provider,
         model_name=model_name,
-        hash_dimension=hash_dimension,
         offline=offline,
         device=device,
     )
@@ -79,7 +77,6 @@ def search(
     model_name: str = typer.Option(DEFAULT_MODEL_NAME),
     embedder_provider: str = typer.Option("sentence-transformer"),
     limit: int = typer.Option(DEFAULT_LIMIT, min=1),
-    hash_dimension: int = typer.Option(64, min=4, help="Only used by the hash embedder."),
     offline: bool = typer.Option(True, help="Load embedding model from local cache only."),
     device: str = typer.Option("cpu", help="Embedding device: cpu, mps, cuda, or auto."),
     reranker_provider: str = typer.Option("cross-encoder"),
@@ -94,7 +91,6 @@ def search(
     embedder = build_default_embedder(
         provider=embedder_provider,
         model_name=model_name,
-        hash_dimension=hash_dimension,
         offline=offline,
         device=device,
     )

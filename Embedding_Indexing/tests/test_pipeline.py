@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pytest
 
-from embedding_indexing.embeddings import HashEmbedder
 from embedding_indexing.pipeline import initialize_chunk_index, index_chunks, search_chunks
 
 
@@ -24,6 +23,44 @@ class FakeReranker:
             else:
                 scores.append(1.0)
         return scores
+
+
+class KeywordEmbedder:
+    dimension = 6
+
+    _TOKEN_TO_DIMENSION = {
+        "app": 0,
+        "launch": 1,
+        "onlaunch": 1,
+        "lifecycle": 2,
+        "page": 3,
+        "register": 4,
+        "onload": 5,
+        "onshow": 5,
+        "methods": 5,
+    }
+
+    def embed_texts(self, texts: list[str]) -> list[list[float]]:
+        return [self._embed_text(text) for text in texts]
+
+    def embed_query(self, text: str) -> list[float]:
+        return self.embed_texts([text])[0]
+
+    def _embed_text(self, text: str) -> list[float]:
+        values = [0.0] * self.dimension
+        normalized_text = (
+            text.lower()
+            .replace("(", " ")
+            .replace(")", " ")
+            .replace("{", " ")
+            .replace("}", " ")
+        )
+        for token in normalized_text.split():
+            cleaned = token.strip(".,")
+            dimension = self._TOKEN_TO_DIMENSION.get(cleaned)
+            if dimension is not None:
+                values[dimension] += 1.0
+        return values
 
 
 def _write_chunks(path: Path) -> None:
@@ -64,19 +101,19 @@ def test_index_and_search_round_trip() -> None:
             qdrant_url=None,
             qdrant_api_key=None,
             collection_name="chunks",
-            embedder=HashEmbedder(dimension=48),
+            embedder=KeywordEmbedder(),
             recreate=True,
         )
         index = initialize_chunk_index(
             path=qdrant_path,
             collection_name="chunks",
-            vector_size=48,
+            vector_size=KeywordEmbedder.dimension,
             recreate=False,
         )
 
         results = search_chunks(
             index=index,
-            embedder=HashEmbedder(dimension=48),
+            embedder=KeywordEmbedder(),
             query="app launch lifecycle",
             limit=1,
             reranker=FakeReranker(),
@@ -106,19 +143,19 @@ def test_search_can_disable_reranker() -> None:
             qdrant_url=None,
             qdrant_api_key=None,
             collection_name="chunks",
-            embedder=HashEmbedder(dimension=48),
+            embedder=KeywordEmbedder(),
             recreate=True,
         )
         index = initialize_chunk_index(
             path=qdrant_path,
             collection_name="chunks",
-            vector_size=48,
+            vector_size=KeywordEmbedder.dimension,
             recreate=False,
         )
 
         results = search_chunks(
             index=index,
-            embedder=HashEmbedder(dimension=48),
+            embedder=KeywordEmbedder(),
             query="app launch lifecycle",
             limit=2,
             enable_reranker=False,
@@ -132,7 +169,7 @@ def test_search_raises_when_reranker_enabled_without_instance() -> None:
     with pytest.raises(ValueError, match="Reranker is enabled"):
         search_chunks(
             index=object(),
-            embedder=HashEmbedder(dimension=8),
+            embedder=KeywordEmbedder(),
             query="app launch lifecycle",
             limit=1,
             reranker=None,

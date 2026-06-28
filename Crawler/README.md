@@ -7,8 +7,8 @@
 - 基于 Playwright 打开 `https://developers.weixin.qq.com/miniprogram/dev/reference/`
 - 从侧边栏定位“框架”目录并提取文档链接
 - 逐页抓取正文、标题、导航路径、更新时间、代码块
-- 按 `h2/h3/h4` 标题层级切块
-- 文本内容与代码示例分开产出，代码也会单独成为可索引 chunk
+- 按 `h1/h2/h3/h4` 标题层级切块
+- 代码与正文统一处理，作为完整文本嵌入
 - 输出页面级、切块级、失败记录三类 JSONL
 - 支持 `full` 全量重爬和 `incremental` 增量输出
 
@@ -69,8 +69,7 @@ python -m crawler run ^
   --mode full ^
   --headless true ^
   --max-concurrency 4 ^
-  --timeout-ms 15000 ^
-  --include-code true
+  --timeout-ms 15000
 ```
 
 参数说明：
@@ -79,7 +78,6 @@ python -m crawler run ^
 - `--headless`: 是否无头运行浏览器
 - `--max-concurrency`: 页面抓取最大并发数
 - `--timeout-ms`: 单页超时时间，单位毫秒
-- `--include-code`: 是否保留代码块
 
 运行完成后会输出类似摘要：
 
@@ -100,7 +98,6 @@ crawl complete: discovered=123 fetched=123 chunks=456 failed=0
 - `title`
 - `nav_path`
 - `raw_text`
-- `code_blocks`
 - `source`
 - `fetched_at`
 - `updated_at`
@@ -113,8 +110,7 @@ crawl complete: discovered=123 fetched=123 chunks=456 failed=0
   "url": "https://developers.weixin.qq.com/miniprogram/dev/reference/api/App.html",
   "title": "App",
   "nav_path": ["文档", "框架", "App"],
-  "raw_text": "页面全文内容",
-  "code_blocks": ["App({})"],
+  "raw_text": "页面全文内容，包含代码",
   "source": "wechat-miniprogram-framework-docs",
   "fetched_at": "2026-03-10T03:00:00+00:00",
   "updated_at": "2026-03-01"
@@ -131,14 +127,11 @@ crawl complete: discovered=123 fetched=123 chunks=456 failed=0
 - `title`
 - `nav_path`
 - `section_path`
-- `chunk_type`
 - `chunk_text`
-- `related_code_ids`
-- `related_text_ids`
 - `token_estimate`
 - `fetched_at`
 
-文本 chunk 示例：
+chunk 示例：
 
 ```json
 {
@@ -148,30 +141,8 @@ crawl complete: discovered=123 fetched=123 chunks=456 failed=0
   "title": "App",
   "nav_path": ["文档", "框架", "App"],
   "section_path": ["注册", "参数"],
-  "chunk_type": "text",
-  "chunk_text": "该章节正文",
-  "related_code_ids": ["1f2a3b4c5d6e7f80-ffeeddccbbaa00998877"],
-  "related_text_ids": [],
+  "chunk_text": "该章节正文及代码",
   "token_estimate": 42,
-  "fetched_at": "2026-03-10T03:00:00+00:00"
-}
-```
-
-代码 chunk 示例：
-
-```json
-{
-  "chunk_id": "1f2a3b4c5d6e7f80-ffeeddccbbaa00998877",
-  "doc_id": "1f2a3b4c5d6e7f80",
-  "url": "https://developers.weixin.qq.com/miniprogram/dev/reference/api/App.html",
-  "title": "App",
-  "nav_path": ["文档", "框架", "App"],
-  "section_path": ["注册", "参数"],
-  "chunk_type": "code",
-  "chunk_text": "App({})",
-  "related_code_ids": [],
-  "related_text_ids": ["1f2a3b4c5d6e7f80-aabbccddeeff00112233"],
-  "token_estimate": 3,
   "fetched_at": "2026-03-10T03:00:00+00:00"
 }
 ```
@@ -227,7 +198,7 @@ python -m pytest Crawler/crawler/tests -o cache_dir=Crawler/state/.pytest_cache
 当前测试覆盖：
 
 - URL 标准化与去重
-- HTML 正文与代码块提取
+- HTML 正文提取
 - 标题层级切块
 - JSONL 字段完整性
 
